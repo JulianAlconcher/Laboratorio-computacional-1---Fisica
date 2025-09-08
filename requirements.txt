@@ -1,0 +1,6 @@
+# Dependencias principales para el proyecto de Física Computacional
+numpy>=1.23.0
+matplotlib>=3.10.0
+
+# Dependencias adicionales que podrían ser útiles para análisis científico
+scipy>=1.10.0
