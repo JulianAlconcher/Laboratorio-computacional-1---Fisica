@@ -1,6 +1,86 @@
 
-from tkinter import Frame, Tk, Label, Entry, Button, messagebox
-from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado
+from logging import root
+from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Text, Scrollbar, Canvas
+from tkinter.ttk import Separator
+from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico
+from PIL import Image, ImageTk
+import os
+
+# Variable global para mantener referencia de imágenes
+photo_references = []
+
+def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angulo, imagen_path):
+    """
+    Crea una nueva ventana para mostrar los resultados con el diseño especificado.
+    """
+    ventana_resultado = Toplevel()
+    ventana_resultado.title("Resultados - Campo Eléctrico")
+    ventana_resultado.geometry("1000x700")
+    ventana_resultado.configure(bg='white')
+    
+    # Frame principal
+    main_frame = Frame(ventana_resultado, bg='white')
+    main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+    
+    # Sección izquierda: Configuración de cargas
+    left_frame = Frame(main_frame, bg='white', relief='solid', bd=1)
+    left_frame.pack(side='left', fill='y', padx=(0, 10))
+    
+    Label(left_frame, text="Configuración de cargas", font=('Arial', 12, 'bold'), 
+          bg='white').pack(pady=10)
+    
+    for i, (carga, x, y) in enumerate(cargas, 1):
+        Label(left_frame, text=f"q{i}: {carga:.2e} C", font=('Arial', 10), 
+              bg='white').pack(anchor='w', padx=10)
+        Label(left_frame, text=f"Posición: ({x}, {y})", font=('Arial', 9), 
+              bg='white', fg='gray').pack(anchor='w', padx=10)
+    
+    Label(left_frame, text=f"\nPunto de cálculo:", font=('Arial', 10, 'bold'), 
+          bg='white').pack(anchor='w', padx=10)
+    Label(left_frame, text=f"({x_punto}, {y_punto})", font=('Arial', 10), 
+          bg='white').pack(anchor='w', padx=10)
+    
+    # Sección de resultado
+    Label(left_frame, text="\nResultado", font=('Arial', 12, 'bold'), 
+          bg='white').pack(pady=(20, 5))
+    
+    resultado_frame = Frame(left_frame, bg='black', relief='solid', bd=1)
+    resultado_frame.pack(fill='x', padx=10, pady=5)
+    
+    resultado_text = f"Ex = {Ex:.2e} N/C\nEy = {Ey:.2e} N/C\nMagnitud = {magnitud:.2e} N/C\nÁngulo = {angulo:.1f}°"
+    
+    Label(resultado_frame, text=resultado_text, font=('Arial', 10), 
+          bg='black', fg='blue', justify='left').pack(pady=10, padx=10)
+    
+    # Sección derecha: Gráfico
+    right_frame = Frame(main_frame, bg='white', relief='solid', bd=1)
+    right_frame.pack(side='right', fill='both', expand=True)
+    
+    Label(right_frame, text="GRAFICO", font=('Arial', 16, 'bold'), 
+          bg='white').pack(pady=10)
+    
+    # Cargar y mostrar la imagen del gráfico
+    try:
+        # Cargar imagen
+        img = Image.open(imagen_path)
+        img = img.resize((700, 500), Image.Resampling.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+        
+        # Canvas para la imagen
+        canvas = Canvas(right_frame, bg='white', width=700, height=500)
+        canvas.pack(pady=10)
+        canvas.create_image(350, 250, image=photo)
+        
+        # Guardar referencia para evitar garbage collection
+        photo_references.append(photo)
+        
+    except Exception as e:
+        Label(right_frame, text=f"Error cargando gráfico: {str(e)}", 
+              font=('Arial', 12), bg='white', fg='red').pack(pady=50)
+    
+    # Botón cerrar
+    Button(ventana_resultado, text="Cerrar", command=ventana_resultado.destroy,
+           font=('Arial', 12), bg='lightgray').pack(side='bottom', pady=10)
 
 def validar_cargas(carga1_val, carga2_val, carga3_val):
     """
@@ -113,18 +193,19 @@ def calcular_graficar():
     try:
         Ex_total, Ey_total, magnitud, angulo = calcular_campo_total(cargas, x_punto, y_punto)
         
-        # Formatear y mostrar el resultado
-        resultado_texto = formatear_resultado(Ex_total, Ey_total, magnitud, angulo)
-        label_resultado.config(text=resultado_texto)
+        # Generar el gráfico E(x) vs x
+        print("Generando gráfico...")
+        imagen_path = graficar_campo_electrico(cargas, x_punto, y_punto)
         
-        # Mostrar mensaje de éxito
-        messagebox.showinfo("Cálculo exitoso", 
-                          f"Campo eléctrico calculado en el punto ({x_punto}, {y_punto})")
+        # Mostrar la nueva ventana de resultados
+        mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex_total, Ey_total, 
+                                 magnitud, angulo, imagen_path)
         
         print(f"Cargas: {cargas}")
         print(f"Punto: ({x_punto}, {y_punto})")
         print(f"Campo eléctrico: Ex={Ex_total:.2e}, Ey={Ey_total:.2e}")
         print(f"Magnitud: {magnitud:.2e} N/C, Ángulo: {angulo:.1f}°")
+        print(f"Gráfico guardado en: {imagen_path}")
         
     except Exception as e:
         messagebox.showerror("Error de cálculo", f"Error al calcular el campo eléctrico: {str(e)}")
@@ -135,6 +216,7 @@ def crear_interfaz():
 
     root = Tk()
     root.title("Laboratorio Computacional 1 - Física")
+    root.geometry("800x300")
     
     Label(root, text="Carga 1: ").grid(row=0, column=0, padx=10, pady=10)
     carga1 = Entry(root)
@@ -163,7 +245,7 @@ def crear_interfaz():
     Label(root, text="Punto de entrada (x,y):").grid(row=3, column=0, padx=10, pady=10)
     entry_punto = Entry(root)
     entry_punto.grid(row=3, column=1, padx=10, pady=10)
-
+    # Crear un frame para centrar el botón
     frame_cargas = Frame(root)
     frame_cargas.grid(row=1, column=1, columnspan=2, padx=10, pady=10)
     
