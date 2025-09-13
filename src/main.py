@@ -15,6 +15,7 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
     ventana.title("Resultados - Campo Eléctrico")
     ventana.geometry("1100x750")
     ventana.configure(bg="#fdfdfd")
+    ventana.resizable(False, False)  # Hacer la ventana no redimensionable
 
     # Frame principal
     main_frame = Frame(ventana, bg="#fdfdfd")
@@ -22,34 +23,63 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
 
     # ===== IZQUIERDA (Texto) =====
     left_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
-    left_frame.pack(side="left", fill="y", padx=(0, 15), ipadx=15, ipady=15)
+    left_frame.pack(side="left", fill="y", padx=(0, 15), ipadx=20, ipady=20)
 
-    Label(left_frame, text="⚡ Configuración de cargas", 
-          font=("Arial", 16, "bold"), bg="white").pack(pady=15)
+    # Título principal
+    Label(left_frame, text="⚡ Configuración de Cargas", 
+          font=("Arial", 16, "bold"), bg="white", fg="black").pack(pady=(10, 20))
 
+    # Información de cada carga
     for i, (carga, x, y) in enumerate(cargas, 1):
-        Label(left_frame, text=f"q{i}: {carga:.2e} C", 
-              font=("Arial", 13), bg="white").pack(anchor="w", padx=15)
-        Label(left_frame, text=f"Posición: ({x}, {y})", 
-              font=("Arial", 12), fg="gray40", bg="white").pack(anchor="w", padx=15, pady=(0,5))
+        # Frame para cada carga
+        carga_frame = Frame(left_frame, bg="#f8f9fa", relief="solid", bd=1)
+        carga_frame.pack(fill="x", padx=10, pady=5)
+        
+        Label(carga_frame, text=f"Carga {i}:", 
+              font=("Arial", 12, "bold"), bg="#f8f9fa", fg="black").pack(anchor="w", padx=10, pady=(5,0))
+        Label(carga_frame, text=f"Valor: {carga:.2e} C", 
+              font=("Arial", 11), bg="#f8f9fa", fg="black").pack(anchor="w", padx=20)
+        Label(carga_frame, text=f"Posición: ({x}, {y}) m", 
+              font=("Arial", 11), bg="#f8f9fa", fg="black").pack(anchor="w", padx=20, pady=(0,5))
 
-    Label(left_frame, text="\nPunto de cálculo:", 
-          font=("Arial", 14, "bold"), bg="white").pack(anchor="w", padx=15, pady=(10,0))
-    Label(left_frame, text=f"({x_punto}, {y_punto})", 
-          font=("Arial", 13), bg="white").pack(anchor="w", padx=15)
+    # Punto de cálculo
+    Label(left_frame, text="📍 Punto de Cálculo:", 
+          font=("Arial", 14, "bold"), bg="white", fg="black").pack(anchor="w", padx=10, pady=(25,5))
+    
+    punto_frame = Frame(left_frame, bg="#e8f4fd", relief="solid", bd=1)
+    punto_frame.pack(fill="x", padx=10, pady=5)
+    Label(punto_frame, text=f"Coordenadas: ({x_punto}, {y_punto}) m", 
+          font=("Arial", 12), bg="#e8f4fd", fg="black").pack(anchor="w", padx=15, pady=8)
 
-    # ===== RESULTADOS COMO TEXTO NORMAL =====
-    Label(left_frame, text="\nResultado:", 
-          font=("Arial", 14, "bold"), bg="white").pack(anchor="w", padx=15, pady=(20,0))
+    # Separador visual
+    separator = Frame(left_frame, height=2, bg="#bdc3c7")
+    separator.pack(fill="x", padx=10, pady=20)
 
-    Label(left_frame, text=f"Ex = {Ex:.2e} N/C", 
-          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
-    Label(left_frame, text=f"Ey = {Ey:.2e} N/C", 
-          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
-    Label(left_frame, text=f"Magnitud = {magnitud:.2e} N/C", 
-          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
-    Label(left_frame, text=f"Ángulo = {angulo:.1f}°", 
-          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
+    # Resultados del campo eléctrico
+    Label(left_frame, text="📊 Resultados del Campo Eléctrico:", 
+          font=("Arial", 14, "bold"), bg="white", fg="black").pack(anchor="w", padx=10, pady=(5,10))
+
+    # Frame para los resultados
+    resultado_frame = Frame(left_frame, bg="#f0f8ff", relief="solid", bd=2)
+    resultado_frame.pack(fill="x", padx=10, pady=5)
+
+    # Componentes del campo
+    Label(resultado_frame, text="Componentes:", 
+          font=("Arial", 12, "bold"), bg="#f0f8ff", fg="black").pack(anchor="w", padx=15, pady=(10,5))
+    
+    Label(resultado_frame, text=f"• Ex = {Ex:.3e} N/C", 
+          font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25)
+    Label(resultado_frame, text=f"• Ey = {Ey:.3e} N/C", 
+          font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25, pady=(0,8))
+
+    # Magnitud y ángulo
+    Label(resultado_frame, text="Características:", 
+          font=("Arial", 12, "bold"), bg="#f0f8ff", fg="black").pack(anchor="w", padx=15, pady=(5,5))
+    
+    Label(resultado_frame, text=f"• Magnitud = {magnitud:.3e} N/C", 
+          font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25)
+    Label(resultado_frame, text=f"• Ángulo = {angulo:.1f}°", 
+          font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25, pady=(0,10))
 
     # ===== DERECHA (Gráfico) =====
     right_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
