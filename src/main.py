@@ -5,82 +5,141 @@ from tkinter.ttk import Separator
 from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico
 from PIL import Image, ImageTk
 import os
+import json
 
 # Variable global para mantener referencia de imágenes
 photo_references = []
 
 def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angulo, imagen_path):
-    """
-    Crea una nueva ventana para mostrar los resultados con el diseño especificado.
-    """
-    ventana_resultado = Toplevel()
-    ventana_resultado.title("Resultados - Campo Eléctrico")
-    ventana_resultado.geometry("1000x700")
-    ventana_resultado.configure(bg='white')
-    
+    ventana = Toplevel()
+    ventana.title("Resultados - Campo Eléctrico")
+    ventana.geometry("1100x750")
+    ventana.configure(bg="#fdfdfd")
+
     # Frame principal
-    main_frame = Frame(ventana_resultado, bg='white')
-    main_frame.pack(fill='both', expand=True, padx=20, pady=20)
-    
-    # Sección izquierda: Configuración de cargas
-    left_frame = Frame(main_frame, bg='white', relief='solid', bd=1)
-    left_frame.pack(side='left', fill='y', padx=(0, 10))
-    
-    Label(left_frame, text="Configuración de cargas", font=('Arial', 12, 'bold'), 
-          bg='white').pack(pady=10)
-    
+    main_frame = Frame(ventana, bg="#fdfdfd")
+    main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    # ===== IZQUIERDA (Texto) =====
+    left_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
+    left_frame.pack(side="left", fill="y", padx=(0, 15), ipadx=15, ipady=15)
+
+    Label(left_frame, text="⚡ Configuración de cargas", 
+          font=("Arial", 16, "bold"), bg="white").pack(pady=15)
+
     for i, (carga, x, y) in enumerate(cargas, 1):
-        Label(left_frame, text=f"q{i}: {carga:.2e} C", font=('Arial', 10), 
-              bg='white').pack(anchor='w', padx=10)
-        Label(left_frame, text=f"Posición: ({x}, {y})", font=('Arial', 9), 
-              bg='white', fg='gray').pack(anchor='w', padx=10)
-    
-    Label(left_frame, text=f"\nPunto de cálculo:", font=('Arial', 10, 'bold'), 
-          bg='white').pack(anchor='w', padx=10)
-    Label(left_frame, text=f"({x_punto}, {y_punto})", font=('Arial', 10), 
-          bg='white').pack(anchor='w', padx=10)
-    
-    # Sección de resultado
-    Label(left_frame, text="\nResultado", font=('Arial', 12, 'bold'), 
-          bg='white').pack(pady=(20, 5))
-    
-    resultado_frame = Frame(left_frame, bg='black', relief='solid', bd=1)
-    resultado_frame.pack(fill='x', padx=10, pady=5)
-    
-    resultado_text = f"Ex = {Ex:.2e} N/C\nEy = {Ey:.2e} N/C\nMagnitud = {magnitud:.2e} N/C\nÁngulo = {angulo:.1f}°"
-    
-    Label(resultado_frame, text=resultado_text, font=('Arial', 10), 
-          bg='black', fg='blue', justify='left').pack(pady=10, padx=10)
-    
-    # Sección derecha: Gráfico
-    right_frame = Frame(main_frame, bg='white', relief='solid', bd=1)
-    right_frame.pack(side='right', fill='both', expand=True)
-    
-    Label(right_frame, text="GRAFICO", font=('Arial', 16, 'bold'), 
-          bg='white').pack(pady=10)
-    
-    # Cargar y mostrar la imagen del gráfico
+        Label(left_frame, text=f"q{i}: {carga:.2e} C", 
+              font=("Arial", 13), bg="white").pack(anchor="w", padx=15)
+        Label(left_frame, text=f"Posición: ({x}, {y})", 
+              font=("Arial", 12), fg="gray40", bg="white").pack(anchor="w", padx=15, pady=(0,5))
+
+    Label(left_frame, text="\nPunto de cálculo:", 
+          font=("Arial", 14, "bold"), bg="white").pack(anchor="w", padx=15, pady=(10,0))
+    Label(left_frame, text=f"({x_punto}, {y_punto})", 
+          font=("Arial", 13), bg="white").pack(anchor="w", padx=15)
+
+    # ===== RESULTADOS COMO TEXTO NORMAL =====
+    Label(left_frame, text="\nResultado:", 
+          font=("Arial", 14, "bold"), bg="white").pack(anchor="w", padx=15, pady=(20,0))
+
+    Label(left_frame, text=f"Ex = {Ex:.2e} N/C", 
+          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
+    Label(left_frame, text=f"Ey = {Ey:.2e} N/C", 
+          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
+    Label(left_frame, text=f"Magnitud = {magnitud:.2e} N/C", 
+          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
+    Label(left_frame, text=f"Ángulo = {angulo:.1f}°", 
+          font=("Arial", 13), bg="white").pack(anchor="w", padx=25)
+
+    # ===== DERECHA (Gráfico) =====
+    right_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
+    right_frame.pack(side="right", fill="both", expand=True)
+
+    Label(right_frame, text="📊 Visualización del campo", 
+          font=("Arial", 18, "bold"), bg="white").pack(pady=15)
+
     try:
-        # Cargar imagen
         img = Image.open(imagen_path)
-        img = img.resize((700, 500), Image.Resampling.LANCZOS)
+        img.thumbnail((850, 600))  # mantiene proporción
         photo = ImageTk.PhotoImage(img)
-        
-        # Canvas para la imagen
-        canvas = Canvas(right_frame, bg='white', width=700, height=500)
-        canvas.pack(pady=10)
-        canvas.create_image(350, 250, image=photo)
-        
-        # Guardar referencia para evitar garbage collection
+
+        canvas = Canvas(right_frame, bg="white", 
+                        width=img.width, height=img.height, 
+                        highlightthickness=0)
+        canvas.pack(pady=15)
+        canvas.create_image(img.width//2, img.height//2, image=photo)
+
         photo_references.append(photo)
-        
+
     except Exception as e:
         Label(right_frame, text=f"Error cargando gráfico: {str(e)}", 
-              font=('Arial', 12), bg='white', fg='red').pack(pady=50)
-    
-    # Botón cerrar
-    Button(ventana_resultado, text="Cerrar", command=ventana_resultado.destroy,
-           font=('Arial', 12), bg='lightgray').pack(side='bottom', pady=10)
+              font=("Arial", 14), bg="white", fg="red").pack(pady=60)
+
+    # ===== BOTÓN CERRAR =====
+    Button(ventana, text="Cerrar", command=ventana.destroy,
+           font=("Arial", 14, "bold"), bg="#f0f0f0", 
+           activebackground="#cfcfcf", width=15).pack(side="bottom", pady=15)
+
+def cargar_configuracion_predeterminada():
+    """
+    Carga la configuración predeterminada desde un archivo JSON y la aplica a los campos.
+    """
+    try:
+        # Ruta al archivo JSON (en el directorio padre de src)
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config_predeterminada.json')
+        
+        # Leer el archivo JSON
+        with open(config_path, 'r', encoding='utf-8') as file:
+            config = json.load(file)
+        
+        # Obtener la configuración
+        config_data = config['configuracion_predeterminada']
+        cargas_config = config_data['cargas']
+        punto_config = config_data['punto_entrada']
+        
+        # Cargar valores en los campos de entrada
+        carga1.delete(0, 'end')
+        carga1.insert(0, str(cargas_config[0]['valor']))
+        
+        carga2.delete(0, 'end')
+        carga2.insert(0, str(cargas_config[1]['valor']))
+        
+        carga3.delete(0, 'end')
+        carga3.insert(0, str(cargas_config[2]['valor']))
+        
+        # Cargar coordenadas
+        carga1_xy.delete(0, 'end')
+        carga1_xy.insert(0, f"{cargas_config[0]['x']}, {cargas_config[0]['y']}")
+        
+        carga2_xy.delete(0, 'end')
+        carga2_xy.insert(0, f"{cargas_config[1]['x']}, {cargas_config[1]['y']}")
+        
+        carga3_xy.delete(0, 'end')
+        carga3_xy.insert(0, f"{cargas_config[2]['x']}, {cargas_config[2]['y']}")
+        
+        # Cargar punto de entrada
+        entry_punto.delete(0, 'end')
+        entry_punto.insert(0, f"{punto_config['x']}, {punto_config['y']}")
+        
+        messagebox.showinfo("Configuración cargada", 
+                          "Se ha cargado la configuración predeterminada exitosamente.")
+        
+    except FileNotFoundError:
+        messagebox.showerror("Error", "No se encontró el archivo de configuración predeterminada.")
+    except json.JSONDecodeError:
+        messagebox.showerror("Error", "Error al leer el archivo de configuración JSON.")
+    except KeyError as e:
+        messagebox.showerror("Error", f"Error en la estructura del archivo JSON: {str(e)}")
+    except Exception as e:
+        messagebox.showerror("Error", f"Error inesperado al cargar configuración: {str(e)}")
+
+def calcular_y_graficar_predeterminado():
+    """
+    Carga la configuración predeterminada y ejecuta el cálculo automáticamente.
+    """
+    cargar_configuracion_predeterminada()
+    # Ejecutar el cálculo directamente
+    calcular_graficar()
 
 def validar_cargas(carga1_val, carga2_val, carga3_val):
     """
@@ -216,7 +275,7 @@ def crear_interfaz():
 
     root = Tk()
     root.title("Laboratorio Computacional 1 - Física")
-    root.geometry("800x300")
+    root.geometry("1000x400")
     
     Label(root, text="Carga 1: ").grid(row=0, column=0, padx=10, pady=10)
     carga1 = Entry(root)
@@ -245,14 +304,46 @@ def crear_interfaz():
     Label(root, text="Punto de entrada (x,y):").grid(row=3, column=0, padx=10, pady=10)
     entry_punto = Entry(root)
     entry_punto.grid(row=3, column=1, padx=10, pady=10)
-    # Crear un frame para centrar el botón
+    
+    # Frame para los botones
+    buttons_frame = Frame(root)
+    buttons_frame.grid(row=4, column=0, columnspan=4, pady=20)
+    
+    # Botón para cargar configuración predeterminada
+    Button(buttons_frame, text="Cargar Configuración Predeterminada", 
+           command=cargar_configuracion_predeterminada,
+           font=('Arial', 10), bg='lightgreen', pady=5).pack(side='left', padx=5)
+    
+    # Botón para calcular con configuración predeterminada
+    Button(buttons_frame, text="Calcular y Graficar Configuración Predeterminada", 
+           command=calcular_y_graficar_predeterminado,
+           font=('Arial', 10), bg='lightcoral', pady=5).pack(side='left', padx=5)
+    
+    # Botón normal de calcular
+    Button(buttons_frame, text="Calcular y Graficar", 
+           command=calcular_graficar,
+           font=('Arial', 10), bg='lightblue', pady=5).pack(side='left', padx=5)
+    
+    # Crear un frame para centrar el botón (ya no se usa)
     frame_cargas = Frame(root)
     frame_cargas.grid(row=1, column=1, columnspan=2, padx=10, pady=10)
+
+    # Instrucciones para el usuario
+    instrucciones_frame = Frame(root)
+    instrucciones_frame.grid(row=5, column=0, columnspan=4, pady=10)
     
-    Button(root, text="Calcular y Graficar", command=calcular_graficar).grid(row=4, column=0, columnspan=2, padx=10, pady=10)
+    instrucciones_text = ("Instrucciones:\n"
+                         "• Use 'Cargar Configuración Predeterminada' para cargar valores de ejemplo\n"
+                         "• Use 'Calcular y Graficar Configuración Predeterminada' para ejecutar directamente con valores por defecto\n"
+                         "• Use 'Calcular y Graficar' para ejecutar con los valores ingresados manualmente\n"
+                         "• Formato de cargas: notación científica (ej: 3e-6 para 3×10⁻⁶ C)\n"
+                         "• Formato de coordenadas: x, y (ej: 0.1, 0.2)")
+    
+    Label(instrucciones_frame, text=instrucciones_text, font=('Arial', 9), 
+          fg='gray', justify='left').pack()
 
     label_resultado = Label(root, text="",font=('Arial', 12), fg='#FFFFFF', justify='left') # resultado del campo eléctrico
-    label_resultado.grid(row=5, column=0, columnspan=4, padx=10, pady=10)
+    label_resultado.grid(row=6, column=0, columnspan=4, padx=10, pady=10)
 
     root.mainloop()
 
