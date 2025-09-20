@@ -26,7 +26,7 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
     left_frame.pack(side="left", fill="y", padx=(0, 15), ipadx=20, ipady=20)
 
     # Título principal
-    Label(left_frame, text="⚡ Configuración de Cargas", 
+    Label(left_frame, text="Configuración de Cargas", 
           font=("Arial", 16, "bold"), bg="white", fg="black").pack(pady=(10, 20))
 
     # Información de cada carga
@@ -43,7 +43,7 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
               font=("Arial", 11), bg="#f8f9fa", fg="black").pack(anchor="w", padx=20, pady=(0,5))
 
     # Punto de cálculo
-    Label(left_frame, text="📍 Punto de Cálculo:", 
+    Label(left_frame, text="Punto de Cálculo:", 
           font=("Arial", 14, "bold"), bg="white", fg="black").pack(anchor="w", padx=10, pady=(25,5))
     
     punto_frame = Frame(left_frame, bg="#e8f4fd", relief="solid", bd=1)
@@ -56,7 +56,7 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
     separator.pack(fill="x", padx=10, pady=20)
 
     # Resultados del campo eléctrico
-    Label(left_frame, text="📊 Resultados del Campo Eléctrico:", 
+    Label(left_frame, text="Resultados del Campo Eléctrico:", 
           font=("Arial", 14, "bold"), bg="white", fg="black").pack(anchor="w", padx=10, pady=(5,10))
 
     # Frame para los resultados
@@ -84,9 +84,6 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
     # ===== DERECHA (Gráfico) =====
     right_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
     right_frame.pack(side="right", fill="both", expand=True)
-
-    Label(right_frame, text="📊 Visualización del campo", 
-          font=("Arial", 18, "bold"), bg="white").pack(pady=15)
 
     try:
         img = Image.open(imagen_path)
