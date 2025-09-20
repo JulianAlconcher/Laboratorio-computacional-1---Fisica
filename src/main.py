@@ -1,8 +1,8 @@
 
 from logging import root
-from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Text, Scrollbar, Canvas
+from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Text, Scrollbar, Canvas, Scale, HORIZONTAL
 from tkinter.ttk import Separator
-from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio
+from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio, graficar_lineas_campo
 from PIL import Image, ImageTk
 import os
 import json
@@ -10,7 +10,7 @@ import json
 # Variable global para mantener referencia de imágenes
 photo_references = []
 
-def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angulo, imagen_path, puntos_equilibrio):
+def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angulo, imagen_path, puntos_equilibrio, imagen_lineas_path):
     ventana = Toplevel()
     ventana.title("Resultados - Campo Eléctrico")
     ventana.geometry("1100x900")
@@ -104,26 +104,152 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
         Label(equilibrio_frame, text="en el rango [-5, 5] metros", 
               font=("Arial", 11), bg="#fff0f5", fg="#8b4513").pack(anchor="w", padx=15, pady=(0,10))
 
-    # ===== DERECHA (Gráfico) =====
+    # ===== DERECHA (Gráfico con Slider) =====
     right_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
     right_frame.pack(side="right", fill="both", expand=True)
 
-    try:
-        img = Image.open(imagen_path)
-        img.thumbnail((850, 600))  # mantiene proporción
-        photo = ImageTk.PhotoImage(img)
+    # Frame para el control de gráficos
+    control_frame = Frame(right_frame, bg="white")
+    control_frame.pack(fill="x", padx=10, pady=10)
 
-        canvas = Canvas(right_frame, bg="white", 
-                        width=img.width, height=img.height, 
-                        highlightthickness=0)
-        canvas.pack(pady=15)
-        canvas.create_image(img.width//2, img.height//2, image=photo)
+    # Variable para rastrear el gráfico actual
+    grafico_actual = {"valor": 0}  # 0 = E(x) vs x, 1 = Líneas de campo
+    
+    def cambiar_grafico(tipo_grafico):
+        """Función que cambia el gráfico según el tipo seleccionado"""
+        try:
+            # Actualizar el valor actual
+            grafico_actual["valor"] = tipo_grafico
+            
+            # Limpiar el canvas anterior
+            for widget in canvas_frame.winfo_children():
+                widget.destroy()
+            
+            # Seleccionar imagen según el tipo de gráfico
+            if tipo_grafico == 0:
+                imagen_actual = imagen_path
+                titulo_actual = "E(x) vs x - Análisis de Equilibrio"
+                # Actualizar estilo de botones
+                btn_ex_vs_x.config(bg="#4CAF50", fg="black", relief="solid", bd=2)
+                btn_lineas.config(bg="#f0f0f0", fg="black", relief="raised", bd=1)
+            else:
+                imagen_actual = imagen_lineas_path
+                titulo_actual = "Líneas de Campo Eléctrico"
+                # Actualizar estilo de botones
+                btn_ex_vs_x.config(bg="#f0f0f0", fg="black", relief="raised", bd=1)
+                btn_lineas.config(bg="#4CAF50", fg="black", relief="solid", bd=2)
+            
+            # Actualizar título
+            titulo_grafico.config(text=titulo_actual)
+            
+            # Cargar y mostrar la nueva imagen
+            img = Image.open(imagen_actual)
+            img.thumbnail((850, 600))
+            photo = ImageTk.PhotoImage(img)
+            
+            canvas = Canvas(canvas_frame, bg="white", 
+                           width=img.width, height=img.height, 
+                           highlightthickness=0)
+            canvas.pack()
+            canvas.create_image(img.width//2, img.height//2, image=photo)
+            
+            # Mantener referencia para evitar garbage collection
+            photo_references.append(photo)
+            
+        except Exception as e:
+            # Mostrar error si no se puede cargar la imagen
+            Label(canvas_frame, text=f"Error cargando gráfico: {str(e)}", 
+                  font=("Arial", 12), bg="white", fg="red").pack(pady=30)
 
-        photo_references.append(photo)
+    # Título del gráfico (dinámico)
+    titulo_grafico = Label(control_frame, text="E(x) vs x - Análisis de Equilibrio", 
+                          font=("Arial", 16, "bold"), bg="white", fg="#2c3e50")
+    titulo_grafico.pack(pady=(0, 15))
 
-    except Exception as e:
-        Label(right_frame, text=f"Error cargando gráfico: {str(e)}", 
-              font=("Arial", 14), bg="white", fg="red").pack(pady=60)
+    # Frame para los botones de selección
+    botones_frame = Frame(control_frame, bg="white")
+    botones_frame.pack(pady=5)
+    
+    # Botón para gráfico E(x) vs x
+    btn_ex_vs_x = Button(botones_frame, text="📊 E(x) vs x", 
+                        command=lambda: cambiar_grafico(0),
+                        font=("Arial", 12, "bold"), 
+                        bg="#4CAF50", fg="black",
+                        relief="solid", bd=2,
+                        padx=20, pady=8,
+                        cursor="hand2")
+    btn_ex_vs_x.pack(side="left", padx=5)
+    
+    # Botón para líneas de campo
+    btn_lineas = Button(botones_frame, text="🌐 Líneas de Campo", 
+                       command=lambda: cambiar_grafico(1),
+                       font=("Arial", 12, "bold"), 
+                       bg="#f0f0f0", fg="black",
+                       relief="raised", bd=1,
+                       padx=20, pady=8,
+                       cursor="hand2")
+    btn_lineas.pack(side="left", padx=5)
+    
+    # Efectos hover para los botones
+    def on_enter_ex(e):
+        if grafico_actual["valor"] != 0:
+            btn_ex_vs_x.config(bg="#45a049")
+    
+    def on_leave_ex(e):
+        if grafico_actual["valor"] != 0:
+            btn_ex_vs_x.config(bg="#f0f0f0")
+    
+    def on_enter_lineas(e):
+        if grafico_actual["valor"] != 1:
+            btn_lineas.config(bg="#45a049")
+    
+    def on_leave_lineas(e):
+        if grafico_actual["valor"] != 1:
+            btn_lineas.config(bg="#f0f0f0")
+    
+    btn_ex_vs_x.bind("<Enter>", on_enter_ex)
+    btn_ex_vs_x.bind("<Leave>", on_leave_ex)
+    btn_lineas.bind("<Enter>", on_enter_lineas)
+    btn_lineas.bind("<Leave>", on_leave_lineas)
+
+    # Descripción de los gráficos
+    descripcion_frame = Frame(control_frame, bg="#f8f9fa", relief="solid", bd=1)
+    descripcion_frame.pack(fill="x", pady=(10, 5), padx=20)
+    
+    descripcion_text = ""
+    if grafico_actual["valor"] == 0:
+        descripcion_text = "• Muestra la variación del campo eléctrico Ex a lo largo del eje x\n• Detecta y marca puntos de equilibrio con análisis de estabilidad"
+    else:
+        descripcion_text = "• Visualiza las líneas de campo eléctrico resultante\n• Las líneas salen de cargas positivas y entran a cargas negativas"
+    
+    descripcion_label = Label(descripcion_frame, text=descripcion_text,
+                             font=("Arial", 10), bg="#f8f9fa", fg="#34495e",
+                             justify="left")
+    descripcion_label.pack(pady=5, padx=10)
+    
+    # Función para actualizar descripción
+    def actualizar_descripcion():
+        if grafico_actual["valor"] == 0:
+            descripcion_text = "• Muestra la variación del campo eléctrico Ex a lo largo del eje x\n• Detecta y marca puntos de equilibrio con análisis de estabilidad"
+        else:
+            descripcion_text = "• Visualiza las líneas de campo eléctrico resultante\n• Las líneas salen de cargas positivas y entran a cargas negativas"
+        descripcion_label.config(text=descripcion_text)
+    
+    # Modificar la función cambiar_grafico para actualizar descripción
+    def cambiar_grafico_con_descripcion(tipo_grafico):
+        cambiar_grafico(tipo_grafico)
+        actualizar_descripcion()
+    
+    # Actualizar los comandos de los botones
+    btn_ex_vs_x.config(command=lambda: cambiar_grafico_con_descripcion(0))
+    btn_lineas.config(command=lambda: cambiar_grafico_con_descripcion(1))
+
+    # Frame para el canvas del gráfico
+    canvas_frame = Frame(right_frame, bg="white")
+    canvas_frame.pack(fill="both", expand=True, pady=10)
+
+    # Mostrar inicialmente el primer gráfico
+    cambiar_grafico_con_descripcion(0)
 
     # ===== BOTÓN CERRAR =====
     Button(ventana, text="Cerrar", command=ventana.destroy,
@@ -303,12 +429,16 @@ def calcular_graficar():
         Ex_total, Ey_total, magnitud, angulo = calcular_campo_total(cargas, x_punto, y_punto)
         
         # Generar el gráfico E(x) vs x y obtener puntos de equilibrio
-        print("Generando gráfico...")
+        print("Generando gráfico E(x) vs x...")
         imagen_path, puntos_equilibrio = graficar_campo_electrico(cargas, x_punto, y_punto)
+        
+        # Generar el gráfico de líneas de campo
+        print("Generando gráfico de líneas de campo...")
+        imagen_lineas_path = graficar_lineas_campo(cargas, x_punto, y_punto)
         
         # Mostrar la nueva ventana de resultados
         mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex_total, Ey_total, 
-                                 magnitud, angulo, imagen_path, puntos_equilibrio)
+                                 magnitud, angulo, imagen_path, puntos_equilibrio, imagen_lineas_path)
         
         print(f"Cargas: {cargas}")
         print(f"Punto: ({x_punto}, {y_punto})")

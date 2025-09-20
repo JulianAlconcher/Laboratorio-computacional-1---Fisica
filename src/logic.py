@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from scipy.optimize import brentq
+from scipy.integrate import odeint
 
 # Constante de Coulomb [N·m²/C²]
 K = 1 / (4 * np.pi * 8.854187817e-12)  # 1/(4πε₀)
@@ -309,3 +310,152 @@ def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-5, 5), num_punt
     plt.close()
     
     return filepath, puntos_equilibrio
+
+def graficar_lineas_campo(cargas, x_punto, y_punto, rango=(-3, 3), resolucion=20):
+    """
+    Genera el gráfico de líneas de campo eléctrico resultante.
+    
+    Parámetros:
+    - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
+    - x_punto, y_punto: punto donde se calculó el campo
+    - rango: tupla (min, max) para el rango del gráfico
+    - resolucion: número de puntos de inicio para líneas de campo
+    
+    Retorna: path del archivo guardado
+    """
+    fig, ax = plt.subplots(figsize=(12, 10))
+    
+    def campo_en_punto(x, y):
+        """Calcula las componentes del campo eléctrico en un punto"""
+        Ex, Ey, _, _ = calcular_campo_total(cargas, x, y)
+        return Ex, Ey
+    
+    def ecuacion_linea_campo(r, t):
+        """Ecuación diferencial para las líneas de campo"""
+        x, y = r
+        Ex, Ey = campo_en_punto(x, y)
+        magnitud = np.sqrt(Ex**2 + Ey**2)
+        if magnitud == 0:
+            return [0, 0]
+        return [Ex/magnitud, Ey/magnitud]
+    
+    # Generar grid de puntos iniciales para las líneas de campo
+    n_lineas = resolucion
+    
+    # Para cada carga positiva, generar líneas radiales hacia afuera
+    for q, x_carga, y_carga in cargas:
+        if q > 0:  # Carga positiva - líneas salen
+            angulos = np.linspace(0, 2*np.pi, n_lineas, endpoint=False)
+            for angulo in angulos:
+                # Punto inicial cercano a la carga
+                x_inicio = x_carga + 0.05 * np.cos(angulo)
+                y_inicio = y_carga + 0.05 * np.sin(angulo)
+                
+                # Integrar hacia adelante
+                t = np.linspace(0, 2, 200)
+                try:
+                    trayectoria = odeint(ecuacion_linea_campo, [x_inicio, y_inicio], t)
+                    x_traj, y_traj = trayectoria[:, 0], trayectoria[:, 1]
+                    
+                    # Filtrar puntos dentro del rango
+                    mask = (x_traj >= rango[0]) & (x_traj <= rango[1]) & \
+                           (y_traj >= rango[0]) & (y_traj <= rango[1])
+                    
+                    if np.any(mask):
+                        ax.plot(x_traj[mask], y_traj[mask], 'b-', alpha=0.6, linewidth=0.8)
+                        
+                        # Agregar flechas para indicar dirección
+                        if len(x_traj[mask]) > 10:
+                            idx_medio = len(x_traj[mask]) // 2
+                            dx = x_traj[mask][idx_medio+1] - x_traj[mask][idx_medio-1]
+                            dy = y_traj[mask][idx_medio+1] - y_traj[mask][idx_medio-1]
+                            ax.arrow(x_traj[mask][idx_medio], y_traj[mask][idx_medio], 
+                                   dx*0.1, dy*0.1, head_width=0.05, head_length=0.05, 
+                                   fc='blue', ec='blue', alpha=0.8)
+                except:
+                    continue
+        
+        else:  # Carga negativa - líneas entran
+            angulos = np.linspace(0, 2*np.pi, n_lineas, endpoint=False)
+            for angulo in angulos:
+                # Punto inicial alejado de la carga
+                x_inicio = x_carga + 1.5 * np.cos(angulo)
+                y_inicio = y_carga + 1.5 * np.sin(angulo)
+                
+                # Verificar que el punto esté en el rango
+                if not (rango[0] <= x_inicio <= rango[1] and rango[0] <= y_inicio <= rango[1]):
+                    continue
+                
+                # Integrar hacia atrás (hacia la carga negativa)
+                t = np.linspace(0, -2, 200)
+                try:
+                    trayectoria = odeint(ecuacion_linea_campo, [x_inicio, y_inicio], t)
+                    x_traj, y_traj = trayectoria[:, 0], trayectoria[:, 1]
+                    
+                    # Filtrar puntos dentro del rango
+                    mask = (x_traj >= rango[0]) & (x_traj <= rango[1]) & \
+                           (y_traj >= rango[0]) & (y_traj <= rango[1])
+                    
+                    if np.any(mask):
+                        ax.plot(x_traj[mask], y_traj[mask], 'r-', alpha=0.6, linewidth=0.8)
+                        
+                        # Agregar flechas para indicar dirección
+                        if len(x_traj[mask]) > 10:
+                            idx_medio = len(x_traj[mask]) // 2
+                            dx = x_traj[mask][idx_medio+1] - x_traj[mask][idx_medio-1]
+                            dy = y_traj[mask][idx_medio+1] - y_traj[mask][idx_medio-1]
+                            ax.arrow(x_traj[mask][idx_medio], y_traj[mask][idx_medio], 
+                                   dx*0.1, dy*0.1, head_width=0.05, head_length=0.05, 
+                                   fc='red', ec='red', alpha=0.8)
+                except:
+                    continue
+    
+    # Marcar las cargas
+    for i, (q, x_carga, y_carga) in enumerate(cargas):
+        color = 'red' if q > 0 else 'blue'
+        symbol = '+' if q > 0 else '-'
+        ax.plot(x_carga, y_carga, 'o', color=color, markersize=12, markeredgecolor='black', linewidth=2)
+        ax.text(x_carga, y_carga, symbol, ha='center', va='center', fontsize=16, fontweight='bold', color='white')
+        ax.text(x_carga, y_carga + 0.2, f'q{i+1}={q:.1e}C', ha='center', va='bottom', fontsize=10, 
+                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.3))
+    
+    # Marcar el punto de cálculo
+    if rango[0] <= x_punto <= rango[1] and rango[0] <= y_punto <= rango[1]:
+        ax.plot(x_punto, y_punto, 'ko', markersize=8, markeredgecolor='yellow', linewidth=2)
+        ax.text(x_punto, y_punto + 0.15, f'P({x_punto}, {y_punto})', ha='center', va='bottom', 
+                fontsize=10, bbox=dict(boxstyle="round,pad=0.3", facecolor='yellow', alpha=0.7))
+    
+    # Configurar el gráfico
+    ax.set_xlim(rango)
+    ax.set_ylim(rango)
+    ax.set_xlabel('x [m]', fontsize=14)
+    ax.set_ylabel('y [m]', fontsize=14)
+    ax.set_title('Líneas de Campo Eléctrico - Campo Resultante', fontsize=16, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
+    
+    # Agregar leyenda
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color='blue', lw=2, label='Líneas desde cargas positivas'),
+        Line2D([0], [0], color='red', lw=2, label='Líneas hacia cargas negativas'),
+        Line2D([0], [0], marker='o', color='red', lw=0, markersize=8, label='Carga positiva'),
+        Line2D([0], [0], marker='o', color='blue', lw=0, markersize=8, label='Carga negativa'),
+        Line2D([0], [0], marker='o', color='black', lw=0, markersize=8, label='Punto de cálculo')
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1, 1))
+    
+    plt.tight_layout()
+    
+    # Guardar en la carpeta graphics
+    graphics_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'graphics')
+    if not os.path.exists(graphics_dir):
+        os.makedirs(graphics_dir)
+    
+    filename = 'lineas_campo_electrico.png'
+    filepath = os.path.join(graphics_dir, filename)
+    
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return filepath
