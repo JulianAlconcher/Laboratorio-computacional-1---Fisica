@@ -2,7 +2,7 @@
 from logging import root
 from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Text, Scrollbar, Canvas
 from tkinter.ttk import Separator
-from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico
+from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio
 from PIL import Image, ImageTk
 import os
 import json
@@ -10,10 +10,10 @@ import json
 # Variable global para mantener referencia de imágenes
 photo_references = []
 
-def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angulo, imagen_path):
+def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angulo, imagen_path, puntos_equilibrio):
     ventana = Toplevel()
     ventana.title("Resultados - Campo Eléctrico")
-    ventana.geometry("1100x750")
+    ventana.geometry("1100x900")
     ventana.configure(bg="#fdfdfd")
     ventana.resizable(False, False)  # Hacer la ventana no redimensionable
 
@@ -80,6 +80,29 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
           font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25)
     Label(resultado_frame, text=f"• Ángulo = {angulo:.1f}°", 
           font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25, pady=(0,10))
+
+    # Puntos de equilibrio
+    Label(left_frame, text="Puntos de Equilibrio (y = 0):", 
+          font=("Arial", 14, "bold"), bg="white", fg="black").pack(anchor="w", padx=10, pady=(20,10))
+
+    equilibrio_frame = Frame(left_frame, bg="#fff0f5", relief="solid", bd=2)
+    equilibrio_frame.pack(fill="x", padx=10, pady=5)
+
+    if puntos_equilibrio:
+        Label(equilibrio_frame, text="Puntos encontrados:", 
+              font=("Arial", 12, "bold"), bg="#fff0f5", fg="black").pack(anchor="w", padx=15, pady=(10,5))
+        
+        for i, (x_eq, estabilidad) in enumerate(puntos_equilibrio, 1):
+            color_estabilidad = "black" if estabilidad == "estable" else "#dc143c"
+            Label(equilibrio_frame, text=f"• Punto {i}: x = {x_eq:.3f} m ({estabilidad})", 
+                  font=("Arial", 11), bg="#fff0f5", fg=color_estabilidad).pack(anchor="w", padx=25)
+        
+        Label(equilibrio_frame, text="", bg="#fff0f5").pack(pady=5)  # Espaciado
+    else:
+        Label(equilibrio_frame, text="No se encontraron puntos de equilibrio", 
+              font=("Arial", 11), bg="#fff0f5", fg="#8b4513").pack(anchor="w", padx=15, pady=10)
+        Label(equilibrio_frame, text="en el rango [-5, 5] metros", 
+              font=("Arial", 11), bg="#fff0f5", fg="#8b4513").pack(anchor="w", padx=15, pady=(0,10))
 
     # ===== DERECHA (Gráfico) =====
     right_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
@@ -279,13 +302,13 @@ def calcular_graficar():
     try:
         Ex_total, Ey_total, magnitud, angulo = calcular_campo_total(cargas, x_punto, y_punto)
         
-        # Generar el gráfico E(x) vs x
+        # Generar el gráfico E(x) vs x y obtener puntos de equilibrio
         print("Generando gráfico...")
-        imagen_path = graficar_campo_electrico(cargas, x_punto, y_punto)
+        imagen_path, puntos_equilibrio = graficar_campo_electrico(cargas, x_punto, y_punto)
         
         # Mostrar la nueva ventana de resultados
         mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex_total, Ey_total, 
-                                 magnitud, angulo, imagen_path)
+                                 magnitud, angulo, imagen_path, puntos_equilibrio)
         
         print(f"Cargas: {cargas}")
         print(f"Punto: ({x_punto}, {y_punto})")

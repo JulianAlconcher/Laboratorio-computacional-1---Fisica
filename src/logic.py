@@ -5,6 +5,7 @@ Funciones de física para el proyecto de Física 2 IS.
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from scipy.optimize import brentq
 
 # Constante de Coulomb [N·m²/C²]
 K = 1 / (4 * np.pi * 8.854187817e-12)  # 1/(4πε₀)
@@ -114,9 +115,104 @@ def calcular_campo_x(carga, x_carga, y_carga, x_values):
         Ex_values.append(Ex)
     return np.array(Ex_values)
 
-def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-2, 2), num_puntos=1000):
+def encontrar_puntos_equilibrio(cargas, rango_x=(-5, 5)):
+    """
+    Encuentra los puntos de equilibrio en el eje x donde E(x) = 0 analíticamente.
+    
+    Para 3 cargas, la ecuación es:
+    E(x) = k*q1*(x-x1)/|x-x1|³ + k*q2*(x-x2)/|x-x2|³ + k*q3*(x-x3)/|x-x3|³ = 0
+    
+    Parámetros:
+    - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
+    - rango_x: tupla (x_min, x_max) para buscar puntos de equilibrio
+    
+    Retorna: lista de puntos de equilibrio [(x1, estabilidad1), (x2, estabilidad2), ...]
+    """
+    puntos_equilibrio = []
+    
+    # Extraer información de las cargas
+    q = [carga[0] for carga in cargas]  # cargas
+    x_pos = [carga[1] for carga in cargas]  # posiciones x
+    y_pos = [carga[2] for carga in cargas]  # posiciones y
+    
+    # Ordenar cargas por posición x para análisis sistemático
+    datos_ordenados = sorted(zip(q, x_pos, y_pos), key=lambda item: item[1])
+    q_ord, x_ord, y_ord = zip(*datos_ordenados)
+    
+    def campo_en_x(x):
+        """Calcula E(x) en el punto x sobre el eje y=0"""
+        Ex_total = 0
+        for i in range(3):
+            dx = x - x_ord[i]
+            dy = 0 - y_ord[i]  # y = 0 en el eje x
+            r = np.sqrt(dx**2 + dy**2)
+            if r > 1e-10:  # Evitar división por cero
+                Ex_total += K * q_ord[i] * dx / (r**3)
+        return Ex_total
+    
+    # Buscar puntos de equilibrio en intervalos específicos
+    intervalos = [
+        (rango_x[0], x_ord[0] - 0.01),      # Antes de la primera carga
+        (x_ord[0] + 0.01, x_ord[1] - 0.01), # Entre primera y segunda carga
+        (x_ord[1] + 0.01, x_ord[2] - 0.01), # Entre segunda y tercera carga
+        (x_ord[2] + 0.01, rango_x[1])       # Después de la tercera carga
+    ]
+    
+    for x_min, x_max in intervalos:
+        if x_max <= x_min:
+            continue
+            
+        try:
+            # Evaluar el campo en los extremos del intervalo
+            E_min = campo_en_x(x_min)
+            E_max = campo_en_x(x_max)
+            
+            # Si hay cambio de signo, existe un punto de equilibrio
+            if E_min * E_max < 0:
+                x_eq = brentq(campo_en_x, x_min, x_max)
+                
+                # Verificar que el punto esté en el rango solicitado
+                if rango_x[0] <= x_eq <= rango_x[1]:
+                    # Analizar la estabilidad del punto de equilibrio
+                    estabilidad = analizar_estabilidad_equilibrio(cargas, x_eq)
+                    puntos_equilibrio.append((x_eq, estabilidad))
+                    
+        except (ValueError, RuntimeError):
+            # No hay raíz en este intervalo o error numérico
+            continue
+    
+    # Ordenar por posición x
+    puntos_equilibrio.sort(key=lambda p: p[0])
+    
+    return puntos_equilibrio
+
+def analizar_estabilidad_equilibrio(cargas, x_eq, delta=1e-4):
+    """
+    Analiza la estabilidad de un punto de equilibrio.
+    
+    Parámetros:
+    - cargas: lista de cargas
+    - x_eq: posición x del punto de equilibrio
+    - delta: pequeño desplazamiento para analizar estabilidad
+    
+    Retorna: 'estable', 'inestable' o 'neutral'
+    """
+    # Calcular campo a la izquierda y derecha del punto de equilibrio
+    Ex_izq, _, _, _ = calcular_campo_total(cargas, x_eq - delta, 0.0)
+    Ex_der, _, _, _ = calcular_campo_total(cargas, x_eq + delta, 0.0)
+    
+    # Si el campo apunta hacia el punto de equilibrio desde ambos lados, es estable
+    if Ex_izq > 0 and Ex_der < 0:
+        return 'estable'
+    elif Ex_izq < 0 and Ex_der > 0:
+        return 'inestable'
+    else:
+        return 'neutral'
+
+def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-5, 5), num_puntos=1000):
     """
     Genera el gráfico de E(x) vs x para cargas individuales y superposición.
+    Incluye detección y marcado de puntos de equilibrio.
     
     Parámetros:
     - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
@@ -124,13 +220,16 @@ def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-2, 2), num_punt
     - rango_x: tupla (x_min, x_max) para el rango del gráfico
     - num_puntos: número de puntos para el gráfico
     
-    Retorna: path del archivo guardado
+    Retorna: (path del archivo guardado, lista de puntos de equilibrio)
     """
     x_values = np.linspace(rango_x[0], rango_x[1], num_puntos)
     
+    # Encontrar puntos de equilibrio
+    puntos_equilibrio = encontrar_puntos_equilibrio(cargas, rango_x)
+    
     # Crear la figura
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
-    fig.suptitle('Campo Eléctrico E(x) vs x', fontsize=16, fontweight='bold')
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    fig.suptitle('Campo Eléctrico E(x) vs x - Análisis de Equilibrio', fontsize=16, fontweight='bold')
     
     # Primer subplot: Cargas individuales
     ax1.set_title('Cargas Individuales')
@@ -150,8 +249,8 @@ def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-2, 2), num_punt
     ax1.legend()
     ax1.axhline(y=0, color='black', linewidth=0.5)
     
-    # Segundo subplot: Superposición
-    ax2.set_title('Superposición de las 3 cargas')
+    # Segundo subplot: Superposición con puntos de equilibrio
+    ax2.set_title('Superposición - Detección de Puntos de Equilibrio')
     
     # Calcular campo total
     Ex_total_values = np.zeros_like(x_values)
@@ -162,17 +261,35 @@ def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-2, 2), num_punt
     ax2.plot(x_values, Ex_total_values, color='purple', linewidth=3, 
              label='Campo Total (Superposición)')
     
+    # Marcar puntos de equilibrio
+    if puntos_equilibrio:
+        x_eq_list = [p[0] for p in puntos_equilibrio]
+        y_eq_list = [0 for _ in puntos_equilibrio]  # Los puntos de equilibrio están en Ex = 0
+        
+        ax2.scatter(x_eq_list, y_eq_list, color='red', s=100, marker='o', 
+                   zorder=5, label=f'Puntos de Equilibrio ({len(puntos_equilibrio)})')
+        
+        # Anotar cada punto de equilibrio
+        for i, (x_eq, estabilidad) in enumerate(puntos_equilibrio):
+            color_est = {'estable': 'green', 'inestable': 'red', 'neutral': 'orange'}[estabilidad]
+            
+            ax2.annotate(f'Eq{i+1}: x={x_eq:.3f}m\n({estabilidad})', 
+                        xy=(x_eq, 0), xytext=(x_eq, max(Ex_total_values)*0.3),
+                        arrowprops=dict(arrowstyle='->', color=color_est, lw=2),
+                        fontsize=10, ha='center',
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color_est, alpha=0.3))
+    
     # Marcar el punto donde se calculó el campo
     if rango_x[0] <= x_punto <= rango_x[1]:
         Ex_punto, _, _, _ = calcular_campo_total(cargas, x_punto, y_punto)
-        ax2.plot(x_punto, Ex_punto, 'ro', markersize=8, 
+        ax2.plot(x_punto, Ex_punto, 'bo', markersize=8, 
                 label=f'Punto calculado ({x_punto}, {y_punto})')
     
     ax2.set_xlabel('x [m]')
     ax2.set_ylabel('Ex [N/C]')
     ax2.grid(True, alpha=0.3)
     ax2.legend()
-    ax2.axhline(y=0, color='black', linewidth=0.5)
+    ax2.axhline(y=0, color='black', linewidth=1, linestyle='-', alpha=0.8)
     
     # Marcar posiciones de las cargas en ambos subplots
     for i, (_, x_carga, _) in enumerate(cargas):
@@ -191,4 +308,4 @@ def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-2, 2), num_punt
     plt.savefig(filepath, dpi=300, bbox_inches='tight')
     plt.close()
     
-    return filepath
+    return filepath, puntos_equilibrio
