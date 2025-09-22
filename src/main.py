@@ -671,6 +671,132 @@ def calcular_potencial_predeterminado():
     cargar_configuracion_predeterminada()
     calcular_potencial_solo_ui()
 
+def graficar_equipotenciales():
+    """
+    Genera un gráfico de superficies equipotenciales para las cargas configuradas.
+    """
+    try:
+        # Obtener las cargas de la interfaz
+        cargas = []
+        
+        # Carga 1
+        try:
+            carga1_val = float(carga1.get())
+            x1, y1 = parsear_coordenadas(carga1_xy.get())
+            cargas.append((carga1_val, x1, y1))
+        except (ValueError, AttributeError):
+            messagebox.showerror("Error", "Por favor, ingrese valores válidos para la Carga 1")
+            return
+            
+        # Carga 2
+        try:
+            carga2_val = float(carga2.get())
+            x2, y2 = parsear_coordenadas(carga2_xy.get())
+        # Filtrar cargas con valor absoluto menor a 1e-6
+        cargas_filtradas = [(c, x, y) for c, x, y in cargas if abs(c) >= 1e-6]
+
+        if not cargas_filtradas:
+            messagebox.showinfo("Información", "No hay cargas significativas para graficar.")
+            return
+
+        # Mejorar margen dinámico
+            x3, y3 = parsear_coordenadas(carga3_xy.get())
+            cargas.append((carga3_val, x3, y3))
+        except (ValueError, AttributeError):
+            messagebox.showerror("Error", "Por favor, ingrese valores válidos para la Carga 3")
+            return
+        
+        # Generar el gráfico de superficies equipotenciales
+        from logic import graficar_superficies_equipotenciales
+        
+        # 1. Filtrar cargas con valor absoluto menor a 1e-6
+        cargas_filtradas = [(c, x, y) for c, x, y in cargas if abs(c) >= 1e-6]
+
+        if not cargas_filtradas:
+            messagebox.showinfo("Información", "No hay cargas significativas para graficar.")
+            return
+
+        # 5. Mejorar margen dinámico
+        x_vals = [x for _, x, _ in cargas_filtradas]
+        y_vals = [y for _, _, y in cargas_filtradas]
+        
+        margen = 2.0  # Margen mínimo
+        
+        # Calcular el rango basándose en la dispersión de las cargas
+        x_min, x_max = min(x_vals) - margen, max(x_vals) + margen
+        y_min, y_max = min(y_vals) - margen, max(y_vals) + margen
+        
+        # El rango del gráfico será el mayor entre el rango x e y para mantener la proporción
+        rango_max = max(x_max - x_min, y_max - y_min) / 2
+        centro_x = (min(x_vals) + max(x_vals)) / 2
+        centro_y = (min(y_vals) + max(y_vals)) / 2
+        
+        rango = (centro_x - rango_max - margen, centro_x + rango_max + margen)
+
+        # Generar el gráfico con las cargas filtradas
+        try:
+            filepath = graficar_superficies_equipotenciales(cargas_filtradas, rango=rango)
+            
+            # Mostrar mensaje de éxito
+            messagebox.showinfo("Éxito", f"Gráfico de superficies equipotenciales guardado en:\n{filepath}")
+            
+            # Mostrar la imagen generada en una nueva ventana
+            mostrar_imagen(filepath, "Superficies Equipotenciales")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo generar el gráfico: {str(e)}")
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Error inesperado: {str(e)}")
+
+def mostrar_imagen(filepath, title="Imagen"):
+    """Muestra una imagen en una nueva ventana redimensionándola a la pantalla."""
+    try:
+        # Crear ventana
+        ventana = Toplevel()
+        ventana.title(title)
+        ventana.update_idletasks()  # asegurar métricas de pantalla
+        
+        # Tamaño máximo permitido (85% de la pantalla)
+        max_w = int(ventana.winfo_screenwidth() * 0.85)
+        max_h = int(ventana.winfo_screenheight() * 0.85)
+        
+        # Cargar imagen
+        # Asegurarse de que la ruta sea absoluta
+        if not os.path.isabs(filepath):
+            project_root = os.path.dirname(os.path.dirname(__file__))
+            filepath = os.path.join(project_root, filepath)
+
+        img = Image.open(filepath)
+        # Redimensionar manteniendo relación de aspecto si excede el tamaño permitido
+        if img.width > max_w or img.height > max_h:
+            img.thumbnail((max_w, max_h), Image.LANCZOS)
+        
+        photo = ImageTk.PhotoImage(img)
+        
+        # Mantener referencia a la imagen
+        global photo_references
+        photo_references.append(photo)
+        
+        # Mostrar imagen
+        label = Label(ventana, image=photo)
+        label.pack(padx=10, pady=10)
+        
+        # Ajustar tamaño de la ventana a la imagen
+        ventana.geometry(f"{img.width + 40}x{img.height + 80}")
+        ventana.minsize(300, 200)
+        
+        # Botón para cerrar
+        btn_cerrar = Button(ventana, text="Cerrar", command=ventana.destroy)
+        btn_cerrar.pack(pady=10)
+        
+        ventana.lift()
+        ventana.focus_force()
+    
+    except FileNotFoundError:
+        messagebox.showerror("Error", f"No se pudo encontrar la imagen en la ruta: {filepath}")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo cargar la imagen: {str(e)}")
+
 def calcular_potencial_solo_ui():
     """
     Calcula el potencial eléctrico y muestra solo el resultado en la UI principal (sin ventana emergente).
@@ -838,26 +964,36 @@ def crear_interfaz():
            command=calcular_potencial,
            font=('Arial', 10), bg='lightcyan', pady=5).pack(side='left', padx=5)
     
-    # Crear un frame para centrar el botón (ya no se usa)
-    frame_cargas = Frame(root)
-    frame_cargas.grid(row=1, column=1, columnspan=2, padx=10, pady=10)
+    # Frame para el botón de Superficies Equipotenciales
+    equipotencial_frame = Frame(root)
+    equipotencial_frame.grid(row=7, column=0, columnspan=4, pady=10)
+    
+    Label(equipotencial_frame, text="SUPERFICIES EQUIPOTENCIALES", 
+          font=('Arial', 12, 'bold'), fg='#8e44ad').pack(pady=(0,5))
+    
+    # Botón para graficar superficies equipotenciales
+    Button(equipotencial_frame, text="Graficar Superficies Equipotenciales", 
+           command=graficar_equipotenciales,
+           font=('Arial', 10, 'bold'), bg='#e6c9ff', pady=8).pack(pady=5)
 
     # Instrucciones para el usuario
     instrucciones_frame = Frame(root)
-    instrucciones_frame.grid(row=7, column=0, columnspan=4, pady=10)
+    instrucciones_frame.grid(row=8, column=0, columnspan=4, pady=10)
     
     instrucciones_text = ("Instrucciones:\n"
                          "• Use 'Cargar Configuración Predeterminada' para cargar valores de ejemplo\n"
                          "• CAMPO ELÉCTRICO: Calcula E(x,y) y genera gráficos de E(x) vs x y líneas de campo\n"
                          "• POTENCIAL ELÉCTRICO: Calcula V(x,y) numéricamente (resultado en ventana emergente)\n"
+                         "• SUPERFICIES EQUIPOTENCIALES: Genera un gráfico de contorno del potencial eléctrico\n"
                          "• Formato de cargas: notación científica (ej: 3e-6 para 3×10⁻⁶ C)\n"
                          "• Formato de coordenadas: x, y (ej: 0.1, 0.2)")
     
     Label(instrucciones_frame, text=instrucciones_text, font=('Arial', 9), 
           fg='gray', justify='left').pack()
 
-    label_resultado = Label(root, text="",font=('Arial', 12), fg='#FFFFFF', justify='left') # resultado del campo eléctrico
-    label_resultado.grid(row=8, column=0, columnspan=4, padx=10, pady=10)
+    # Frame para el resultado (inicialmente vacío)
+    label_resultado = Label(root, text="", font=('Arial', 12), fg='#FFFFFF', justify='left')
+    label_resultado.grid(row=9, column=0, columnspan=4, padx=10, pady=10)
 
     root.mainloop()
 
