@@ -2,10 +2,11 @@
 from logging import root
 from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Text, Scrollbar, Canvas, Scale, HORIZONTAL
 from tkinter.ttk import Separator
-from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio, graficar_lineas_campo
+from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio, graficar_lineas_campo, calcular_potencial_total
 from PIL import Image, ImageTk
 import os
 import json
+import numpy as np
 
 # Variable global para mantener referencia de imágenes
 photo_references = []
@@ -256,6 +257,8 @@ def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angul
            font=("Arial", 14, "bold"), bg="#f0f0f0", 
            activebackground="#cfcfcf", width=15).pack(side="bottom", pady=15)
 
+
+
 def cargar_configuracion_predeterminada():
     """
     Carga la configuración predeterminada desde un archivo JSON y la aplica a los campos.
@@ -450,12 +453,298 @@ def calcular_graficar():
         messagebox.showerror("Error de cálculo", f"Error al calcular el campo eléctrico: {str(e)}")
         print(f"Error: {e}")
 
+def mostrar_resultado_potencial_numerico(cargas, x_punto, y_punto, V_total):
+    """
+    Muestra una ventana emergente con el resultado numérico del potencial eléctrico
+    """
+    print(f"DEBUG: Abriendo ventana de potencial - V = {V_total}")
+    
+    try:
+        ventana = Toplevel()
+        ventana.title("Resultado - Potencial Eléctrico V(x,y)")
+        ventana.geometry("700x600")
+        ventana.configure(bg="#fdfdfd")
+        ventana.resizable(True, True)
+
+        # Frame principal
+        main_frame = Frame(ventana, bg="white", relief="solid", bd=2)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Título principal
+        titulo = Label(main_frame, text="POTENCIAL ELÉCTRICO V(x,y)", 
+                      font=("Arial", 20, "bold"), bg="white", fg="#2c3e50")
+        titulo.pack(pady=(15, 25))
+
+        # Mostrar configuración de cargas
+        config_label = Label(main_frame, text="Configuración de Cargas:", 
+                            font=("Arial", 14, "bold"), bg="white", fg="black")
+        config_label.pack(anchor="w", padx=20, pady=(0,10))
+        
+        for i, (carga, x, y) in enumerate(cargas, 1):
+            carga_info = f"• Carga {i}: {carga:.2e} C en posición ({x}, {y}) m"
+            carga_label = Label(main_frame, text=carga_info, 
+                               font=("Arial", 12), bg="white", fg="black")
+            carga_label.pack(anchor="w", padx=40, pady=2)
+
+        # Punto de cálculo
+        punto_label = Label(main_frame, text=f"Punto de Cálculo: ({x_punto}, {y_punto}) m", 
+                           font=("Arial", 14, "bold"), bg="white", fg="#2c3e50")
+        punto_label.pack(pady=(20,30))
+
+        # RESULTADO PRINCIPAL - Frame destacado
+        resultado_frame = Frame(main_frame, bg="#e8f5e8", relief="solid", bd=3)
+        resultado_frame.pack(fill="x", padx=20, pady=20)
+
+        resultado_titulo = Label(resultado_frame, text="RESULTADO:", 
+                                font=("Arial", 16, "bold"), bg="#e8f5e8", fg="#2c3e50")
+        resultado_titulo.pack(pady=(15,10))
+
+        # Mostrar el valor del potencial
+        if np.isinf(V_total):
+            valor_label = Label(resultado_frame, text="V = ∞ Voltios", 
+                               font=("Arial", 24, "bold"), bg="#e8f5e8", fg="red")
+            valor_label.pack(pady=10)
+            
+            explicacion_label = Label(resultado_frame, text="(El punto coincide con una carga)", 
+                                     font=("Arial", 12), bg="#e8f5e8", fg="red")
+            explicacion_label.pack(pady=(0,15))
+        else:
+            valor_label = Label(resultado_frame, text=f"V = {V_total:.6e} V", 
+                               font=("Arial", 24, "bold"), bg="#e8f5e8", fg="#2e8b57")
+            valor_label.pack(pady=(10,15))
+
+        # Información de la fórmula
+        formula_frame = Frame(main_frame, bg="#fff8dc", relief="solid", bd=1)
+        formula_frame.pack(fill="x", padx=20, pady=15)
+
+        formula_titulo = Label(formula_frame, text="Fórmula utilizada:", 
+                              font=("Arial", 12, "bold"), bg="#fff8dc", fg="#8b4513")
+        formula_titulo.pack(pady=(10,5))
+
+        formula_texto = Label(formula_frame, text="V = Σ(k·qi/ri)", 
+                             font=("Arial", 14, "bold"), bg="#fff8dc", fg="#8b4513")
+        formula_texto.pack(pady=2)
+
+        constante_texto = Label(formula_frame, text="donde k = 8.99×10⁹ N·m²/C² (constante de Coulomb)", 
+                               font=("Arial", 10), bg="#fff8dc", fg="#8b4513")
+        constante_texto.pack(pady=(2,10))
+
+        # Botón cerrar
+        boton_cerrar = Button(ventana, text="Cerrar", command=ventana.destroy,
+                             font=("Arial", 14, "bold"), bg="#f0f0f0", 
+                             activebackground="#cfcfcf", width=15, pady=5)
+        boton_cerrar.pack(side="bottom", pady=20)
+        
+        # Centrar ventana y ponerla al frente
+        ventana.update_idletasks()
+        ventana.lift()
+        ventana.focus_force()
+        ventana.grab_set()
+        
+        print("DEBUG: Ventana de potencial creada exitosamente")
+        
+    except Exception as e:
+        print(f"ERROR: No se pudo crear la ventana de potencial: {e}")
+        messagebox.showerror("Error", f"No se pudo mostrar el resultado del potencial: {str(e)}")
+
+def calcular_potencial():
+    """
+    Calcula el potencial eléctrico V(x,y) en el punto especificado (solo resultado numérico).
+    """
+    print("DEBUG: Función calcular_potencial llamada")
+
+    # Obtener valores de las cargas (igual validación que para campo eléctrico)
+    carga1_val = carga1.get().strip()
+    carga2_val = carga2.get().strip()
+    carga3_val = carga3.get().strip()
+    
+    print(f"DEBUG: Valores de cargas obtenidos: {carga1_val}, {carga2_val}, {carga3_val}")
+    
+    # Verificar que todos los campos de cargas estén llenos
+    if not all([carga1_val, carga2_val, carga3_val]):
+        messagebox.showerror("Error", "Por favor ingrese valores para todas las cargas")
+        return
+    
+    # Validar las cargas
+    es_valido, mensaje = validar_cargas(carga1_val, carga2_val, carga3_val)
+    
+    if not es_valido:
+        messagebox.showerror("Error de validación", mensaje)
+        return
+    
+    print("DEBUG: Cargas validadas correctamente")
+    
+    # Obtener coordenadas de las cargas
+    try:
+        coord1_str = carga1_xy.get().strip()
+        coord2_str = carga2_xy.get().strip()
+        coord3_str = carga3_xy.get().strip()
+        
+        if not all([coord1_str, coord2_str, coord3_str]):
+            messagebox.showerror("Error", "Por favor ingrese las coordenadas de todas las cargas")
+            return
+            
+        x1, y1 = parsear_coordenadas(coord1_str)
+        x2, y2 = parsear_coordenadas(coord2_str)
+        x3, y3 = parsear_coordenadas(coord3_str)
+        
+        print(f"DEBUG: Coordenadas parseadas: ({x1},{y1}), ({x2},{y2}), ({x3},{y3})")
+        
+    except ValueError as e:
+        messagebox.showerror("Error de coordenadas", f"Error en coordenadas de cargas: {str(e)}")
+        return
+    
+    # Obtener punto donde calcular el potencial
+    try:
+        punto_str = entry_punto.get().strip()
+        if not punto_str:
+            messagebox.showerror("Error", "Por favor ingrese el punto donde calcular el potencial")
+            return
+            
+        x_punto, y_punto = parsear_coordenadas(punto_str)
+        print(f"DEBUG: Punto de cálculo: ({x_punto}, {y_punto})")
+        
+    except ValueError as e:
+        messagebox.showerror("Error de punto", f"Error en punto de entrada: {str(e)}")
+        return
+    
+    # Convertir cargas a float
+    try:
+        q1 = float(carga1_val)
+        q2 = float(carga2_val)
+        q3 = float(carga3_val)
+        print(f"DEBUG: Cargas convertidas: {q1}, {q2}, {q3}")
+    except ValueError:
+        messagebox.showerror("Error", "Error al convertir cargas a números")
+        return
+    
+    # Crear lista de cargas para el cálculo
+    cargas = [
+        (q1, x1, y1),
+        (q2, x2, y2),
+        (q3, x3, y3)
+    ]
+    
+    print(f"DEBUG: Lista de cargas creada: {cargas}")
+    
+    # Calcular el potencial eléctrico total en el punto especificado
+    try:
+        print("DEBUG: Iniciando cálculo de potencial...")
+        V_total = calcular_potencial_total(cargas, x_punto, y_punto)
+        print(f"DEBUG: Potencial calculado = {V_total}")
+        
+        # Mostrar resultado numérico solo en una ventana emergente
+        print("DEBUG: Llamando a mostrar_resultado_potencial_numerico...")
+        mostrar_resultado_potencial_numerico(cargas, x_punto, y_punto, V_total)
+        
+        print(f"Cargas: {cargas}")
+        print(f"Punto: ({x_punto}, {y_punto})")
+        print(f"Potencial eléctrico: V = {V_total:.2e} V")
+        
+    except Exception as e:
+        messagebox.showerror("Error de cálculo", f"Error al calcular el potencial eléctrico: {str(e)}")
+        print(f"ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+
+def calcular_potencial_predeterminado():
+    """
+    Carga la configuración predeterminada y calcula el potencial automáticamente (solo en ventana emergente).
+    """
+    cargar_configuracion_predeterminada()
+    calcular_potencial_solo_ui()
+
+def calcular_potencial_solo_ui():
+    """
+    Calcula el potencial eléctrico y muestra solo el resultado en la UI principal (sin ventana emergente).
+    """
+    print("Función calcular_potencial_solo_ui llamada")
+
+    # Obtener valores de las cargas (igual validación que para campo eléctrico)
+    carga1_val = carga1.get().strip()
+    carga2_val = carga2.get().strip()
+    carga3_val = carga3.get().strip()
+    
+    # Verificar que todos los campos de cargas estén llenos
+    if not all([carga1_val, carga2_val, carga3_val]):
+        messagebox.showerror("Error", "Por favor ingrese valores para todas las cargas")
+        return
+    
+    # Validar las cargas
+    es_valido, mensaje = validar_cargas(carga1_val, carga2_val, carga3_val)
+    
+    if not es_valido:
+        messagebox.showerror("Error de validación", mensaje)
+        return
+    
+    # Obtener coordenadas de las cargas
+    try:
+        coord1_str = carga1_xy.get().strip()
+        coord2_str = carga2_xy.get().strip()
+        coord3_str = carga3_xy.get().strip()
+        
+        if not all([coord1_str, coord2_str, coord3_str]):
+            messagebox.showerror("Error", "Por favor ingrese las coordenadas de todas las cargas")
+            return
+            
+        x1, y1 = parsear_coordenadas(coord1_str)
+        x2, y2 = parsear_coordenadas(coord2_str)
+        x3, y3 = parsear_coordenadas(coord3_str)
+        
+    except ValueError as e:
+        messagebox.showerror("Error de coordenadas", f"Error en coordenadas de cargas: {str(e)}")
+        return
+    
+    # Obtener punto donde calcular el potencial
+    try:
+        punto_str = entry_punto.get().strip()
+        if not punto_str:
+            messagebox.showerror("Error", "Por favor ingrese el punto donde calcular el potencial")
+            return
+            
+        x_punto, y_punto = parsear_coordenadas(punto_str)
+        
+    except ValueError as e:
+        messagebox.showerror("Error de punto", f"Error en punto de entrada: {str(e)}")
+        return
+    
+    # Convertir cargas a float
+    try:
+        q1 = float(carga1_val)
+        q2 = float(carga2_val)
+        q3 = float(carga3_val)
+    except ValueError:
+        messagebox.showerror("Error", "Error al convertir cargas a números")
+        return
+    
+    # Crear lista de cargas para el cálculo
+    cargas = [
+        (q1, x1, y1),
+        (q2, x2, y2),
+        (q3, x3, y3)
+    ]
+    
+    # Calcular el potencial eléctrico total en el punto especificado
+    try:
+        V_total = calcular_potencial_total(cargas, x_punto, y_punto)
+        
+        # Mostrar resultado numérico solo en una ventana emergente
+        mostrar_resultado_potencial_numerico(cargas, x_punto, y_punto, V_total)
+        
+        print(f"Cargas: {cargas}")
+        print(f"Punto: ({x_punto}, {y_punto})")
+        print(f"Potencial eléctrico: V = {V_total:.2e} V")
+        
+    except Exception as e:
+        messagebox.showerror("Error de cálculo", f"Error al calcular el potencial eléctrico: {str(e)}")
+        print(f"Error: {e}")
+
 def crear_interfaz():
     global carga1, carga2, carga3, carga1_xy, carga2_xy, carga3_xy, entry_punto, label_resultado, frame_cargas
 
     root = Tk()
     root.title("Laboratorio Computacional 1 - Física")
-    root.geometry("1000x400")
+    root.geometry("1000x500")
     
     Label(root, text="Carga 1: ").grid(row=0, column=0, padx=10, pady=10)
     carga1 = Entry(root)
@@ -485,24 +774,52 @@ def crear_interfaz():
     entry_punto = Entry(root)
     entry_punto.grid(row=3, column=1, padx=10, pady=10)
     
-    # Frame para los botones
-    buttons_frame = Frame(root)
-    buttons_frame.grid(row=4, column=0, columnspan=4, pady=20)
+    # Frame para los botones de configuración
+    config_frame = Frame(root)
+    config_frame.grid(row=4, column=0, columnspan=4, pady=10)
     
     # Botón para cargar configuración predeterminada
-    Button(buttons_frame, text="Cargar Configuración Predeterminada", 
+    Button(config_frame, text="Cargar Configuración Predeterminada", 
            command=cargar_configuracion_predeterminada,
-           font=('Arial', 10), bg='lightgreen', pady=5).pack(side='left', padx=5)
+           font=('Arial', 10), bg='lightgreen', pady=5).pack(pady=5)
     
-    # Botón para calcular con configuración predeterminada
-    Button(buttons_frame, text="Calcular y Graficar Configuración Predeterminada", 
+    # Frame para los botones de Campo Eléctrico
+    campo_frame = Frame(root)
+    campo_frame.grid(row=5, column=0, columnspan=4, pady=10)
+    
+    Label(campo_frame, text="CAMPO ELÉCTRICO E(x,y)", 
+          font=('Arial', 12, 'bold'), fg='#2c3e50').pack(pady=(0,5))
+    
+    # Botones de campo eléctrico
+    buttons_campo_frame = Frame(campo_frame)
+    buttons_campo_frame.pack()
+    
+    Button(buttons_campo_frame, text="Calcular Campo con Config. Predeterminada", 
            command=calcular_y_graficar_predeterminado,
            font=('Arial', 10), bg='lightcoral', pady=5).pack(side='left', padx=5)
     
-    # Botón normal de calcular
-    Button(buttons_frame, text="Calcular y Graficar", 
+    Button(buttons_campo_frame, text="Calcular Campo Eléctrico", 
            command=calcular_graficar,
            font=('Arial', 10), bg='lightblue', pady=5).pack(side='left', padx=5)
+    
+    # Frame para los botones de Potencial Eléctrico
+    potencial_frame = Frame(root)
+    potencial_frame.grid(row=6, column=0, columnspan=4, pady=10)
+    
+    Label(potencial_frame, text="POTENCIAL ELÉCTRICO V(x,y)", 
+          font=('Arial', 12, 'bold'), fg='#27ae60').pack(pady=(0,5))
+    
+    # Botones de potencial eléctrico
+    buttons_potencial_frame = Frame(potencial_frame)
+    buttons_potencial_frame.pack()
+    
+    Button(buttons_potencial_frame, text="Calcular Potencial con Config. Predeterminada", 
+           command=calcular_potencial_predeterminado,
+           font=('Arial', 10), bg='lightyellow', pady=5).pack(side='left', padx=5)
+    
+    Button(buttons_potencial_frame, text="Calcular Potencial Eléctrico", 
+           command=calcular_potencial,
+           font=('Arial', 10), bg='lightcyan', pady=5).pack(side='left', padx=5)
     
     # Crear un frame para centrar el botón (ya no se usa)
     frame_cargas = Frame(root)
@@ -510,12 +827,12 @@ def crear_interfaz():
 
     # Instrucciones para el usuario
     instrucciones_frame = Frame(root)
-    instrucciones_frame.grid(row=5, column=0, columnspan=4, pady=10)
+    instrucciones_frame.grid(row=7, column=0, columnspan=4, pady=10)
     
     instrucciones_text = ("Instrucciones:\n"
                          "• Use 'Cargar Configuración Predeterminada' para cargar valores de ejemplo\n"
-                         "• Use 'Calcular y Graficar Configuración Predeterminada' para ejecutar directamente con valores por defecto\n"
-                         "• Use 'Calcular y Graficar' para ejecutar con los valores ingresados manualmente\n"
+                         "• CAMPO ELÉCTRICO: Calcula E(x,y) y genera gráficos de E(x) vs x y líneas de campo\n"
+                         "• POTENCIAL ELÉCTRICO: Calcula V(x,y) numéricamente (resultado en ventana emergente)\n"
                          "• Formato de cargas: notación científica (ej: 3e-6 para 3×10⁻⁶ C)\n"
                          "• Formato de coordenadas: x, y (ej: 0.1, 0.2)")
     
@@ -523,7 +840,7 @@ def crear_interfaz():
           fg='gray', justify='left').pack()
 
     label_resultado = Label(root, text="",font=('Arial', 12), fg='#FFFFFF', justify='left') # resultado del campo eléctrico
-    label_resultado.grid(row=6, column=0, columnspan=4, padx=10, pady=10)
+    label_resultado.grid(row=8, column=0, columnspan=4, padx=10, pady=10)
 
     root.mainloop()
 
