@@ -692,6 +692,20 @@ def graficar_equipotenciales():
         try:
             carga2_val = float(carga2.get())
             x2, y2 = parsear_coordenadas(carga2_xy.get())
+            cargas.append((carga2_val, x2, y2))
+        except (ValueError, AttributeError):
+            messagebox.showerror("Error", "Por favor, ingrese valores válidos para la Carga 2")
+            return
+            
+        # Carga 3
+        try:
+            carga3_val = float(carga3.get())
+            x3, y3 = parsear_coordenadas(carga3_xy.get())
+            cargas.append((carga3_val, x3, y3))
+        except (ValueError, AttributeError):
+            messagebox.showerror("Error", "Por favor, ingrese valores válidos para la Carga 3")
+            return
+        
         # Filtrar cargas con valor absoluto menor a 1e-6
         cargas_filtradas = [(c, x, y) for c, x, y in cargas if abs(c) >= 1e-6]
 
@@ -700,23 +714,6 @@ def graficar_equipotenciales():
             return
 
         # Mejorar margen dinámico
-            x3, y3 = parsear_coordenadas(carga3_xy.get())
-            cargas.append((carga3_val, x3, y3))
-        except (ValueError, AttributeError):
-            messagebox.showerror("Error", "Por favor, ingrese valores válidos para la Carga 3")
-            return
-        
-        # Generar el gráfico de superficies equipotenciales
-        from logic import graficar_superficies_equipotenciales
-        
-        # 1. Filtrar cargas con valor absoluto menor a 1e-6
-        cargas_filtradas = [(c, x, y) for c, x, y in cargas if abs(c) >= 1e-6]
-
-        if not cargas_filtradas:
-            messagebox.showinfo("Información", "No hay cargas significativas para graficar.")
-            return
-
-        # 5. Mejorar margen dinámico
         x_vals = [x for _, x, _ in cargas_filtradas]
         y_vals = [y for _, _, y in cargas_filtradas]
         
@@ -735,6 +732,7 @@ def graficar_equipotenciales():
 
         # Generar el gráfico con las cargas filtradas
         try:
+            from logic import graficar_superficies_equipotenciales
             filepath = graficar_superficies_equipotenciales(cargas_filtradas, rango=rango)
             
             # Mostrar mensaje de éxito
@@ -769,7 +767,7 @@ def mostrar_imagen(filepath, title="Imagen"):
         img = Image.open(filepath)
         # Redimensionar manteniendo relación de aspecto si excede el tamaño permitido
         if img.width > max_w or img.height > max_h:
-            img.thumbnail((max_w, max_h), Image.LANCZOS)
+            img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
         
         photo = ImageTk.PhotoImage(img)
         

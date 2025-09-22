@@ -2,6 +2,7 @@
 logic.py
 Funciones de física para el proyecto de Física 2 IS.
 """
+from fileinput import filename
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -613,14 +614,12 @@ def graficar_superficies_equipotenciales(cargas, rango=(-5, 5), num_puntos=100, 
     plt.tight_layout()
     plt.savefig(filepath, dpi=300, bbox_inches='tight')
     plt.close()
-
-    return filepath
     plt.tight_layout()
     plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
+    return filepath
     
-    return filename
-=======
+    
 def graficar_potencial(cargas, x_punto, y_punto, rango_x=(-5, 5), num_puntos=1000):
     x_values = np.linspace(rango_x[0], rango_x[1], num_puntos)
 
