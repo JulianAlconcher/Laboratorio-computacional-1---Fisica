@@ -5,6 +5,7 @@ Funciones de física para el proyecto de Física 2 IS.
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import datetime
 from scipy.optimize import brentq
 from scipy.integrate import odeint
 
@@ -380,7 +381,7 @@ def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-5, 5), num_punt
     filename = 'campo_electrico_vs_x.png'
     filepath = os.path.join(graphics_dir, filename)
     
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.savefig(filepath, dpi=150, bbox_inches='tight')
     plt.close()
     
     return filepath, puntos_equilibrio
@@ -518,22 +519,107 @@ def graficar_lineas_campo(cargas, x_punto, y_punto, rango=(-3, 3), resolucion=20
         Line2D([0], [0], marker='o', color='black', lw=0, markersize=8, label='Punto de cálculo')
     ]
     ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1, 1))
-    
+
     plt.tight_layout()
-    
-    # Guardar en la carpeta graphics
-    graphics_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'graphics')
-    if not os.path.exists(graphics_dir):
-        os.makedirs(graphics_dir)
-    
-    filename = 'lineas_campo_electrico.png'
+
+    # Crear ruta absoluta para el directorio de gráficos
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    graphics_dir = os.path.join(project_root, 'graphics')
+    os.makedirs(graphics_dir, exist_ok=True)
+
+    # Guardar la figura
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'lineas_campo_{timestamp}.png'
     filepath = os.path.join(graphics_dir, filename)
-    
+    plt.tight_layout()
     plt.savefig(filepath, dpi=300, bbox_inches='tight')
     plt.close()
-    
+
     return filepath
 
+def graficar_superficies_equipotenciales(cargas, rango=(-5, 5), num_puntos=100, niveles=20):
+    """
+    Genera un gráfico de contorno que representa las superficies equipotenciales.
+
+    Parámetros:
+    - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
+    - rango: tupla (min, max) para el rango del gráfico en ambos ejes
+    - num_puntos: número de puntos en cada dirección para la malla
+    - niveles: número de curvas de nivel a mostrar
+
+    Retorna: path del archivo guardado
+    """
+    # Crear malla de puntos
+    x = np.linspace(rango[0], rango[1], num_puntos)
+    y = np.linspace(rango[0], rango[1], num_puntos)
+    X, Y = np.meshgrid(x, y)
+
+    # 3. Vectorizar el cálculo del potencial para mayor eficiencia
+    V = np.zeros_like(X)
+    for carga, x_carga, y_carga in cargas:
+        dx = X - x_carga
+        dy = Y - y_carga
+        # Añadir un pequeño épsilon para evitar la división por cero en la posición exacta de la carga
+        r = np.sqrt(dx**2 + dy**2) + 1e-9
+        V += K * carga / r
+
+    # Limitar los valores extremos del potencial para una mejor visualización de los contornos
+    # Esto evita que los infinitos en las posiciones de las cargas dominen la escala de colores
+    v_max = np.nanpercentile(V[np.isfinite(V)], 98)
+    v_min = np.nanpercentile(V[np.isfinite(V)], 2)
+    V = np.clip(V, v_min, v_max)
+
+    # 4. Ajustar niveles de contorno para incluir siempre V=0
+    max_abs_v = max(abs(v_min), abs(v_max))
+    v_levels = np.linspace(-max_abs_v, max_abs_v, niveles)
+    # Asegurarse de que el nivel 0.0 esté presente para visualizar la línea de potencial nulo
+    if 0.0 not in v_levels:
+        v_levels = np.sort(np.append(v_levels, 0.0))
+
+    # Crear figura
+    plt.figure(figsize=(10, 8))
+
+    # Graficar contornos de potencial
+    contorno = plt.contour(X, Y, V, levels=v_levels, colors='purple', linewidths=1, linestyles='solid')
+    plt.clabel(contorno, inline=True, fontsize=8, fmt='%1.1f V')
+
+    # 2. Validación en el bucle de dibujo de cargas
+    for carga, x_carga, y_carga in cargas:
+        if abs(carga) < 1e-9:  # Ignorar cargas prácticamente nulas
+            continue
+        color = 'red' if carga > 0 else 'blue'
+        plt.scatter(x_carga, y_carga, color=color, s=100, edgecolors='black', zorder=5)
+        plt.text(x_carga + 0.1, y_carga + 0.1, f'{carga:.1e} C', fontsize=9, 
+                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
+
+    # Configuración del gráfico
+    plt.title('Superficies Equipotenciales', pad=20)
+    plt.xlabel('Posición X (m)')
+    plt.ylabel('Posición Y (m)')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.axhline(0, color='black', linewidth=0.5)
+    plt.axvline(0, color='black', linewidth=0.5)
+    plt.axis('equal')
+
+    # Crear ruta absoluta para el directorio de gráficos
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    graphics_dir = os.path.join(project_root, 'graphics')
+    os.makedirs(graphics_dir, exist_ok=True)
+
+    # Guardar la figura
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'equipotenciales_{timestamp}.png'
+    filepath = os.path.join(graphics_dir, filename)
+    plt.tight_layout()
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return filepath
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return filename
 
 def calcular_potencial_en_linea(cargas, x_inicio, x_fin, y_fijo=0, num_puntos=1000):
     """
