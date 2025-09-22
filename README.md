@@ -12,6 +12,7 @@ Este proyecto simula el comportamiento de cargas eléctricas puntuales y calcula
 ## Autores Principales
 - **Julian Alconcher**
 - **Antonio Carlos**
+- **Tobias Thiessen**
 - otros...
 
 ## Estructura del Proyecto
