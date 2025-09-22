@@ -692,14 +692,14 @@ def graficar_equipotenciales():
         try:
             carga2_val = float(carga2.get())
             x2, y2 = parsear_coordenadas(carga2_xy.get())
-            cargas.append((carga2_val, x2, y2))
-        except (ValueError, AttributeError):
-            messagebox.showerror("Error", "Por favor, ingrese valores válidos para la Carga 2")
+        # Filtrar cargas con valor absoluto menor a 1e-6
+        cargas_filtradas = [(c, x, y) for c, x, y in cargas if abs(c) >= 1e-6]
+
+        if not cargas_filtradas:
+            messagebox.showinfo("Información", "No hay cargas significativas para graficar.")
             return
-            
-        # Carga 3
-        try:
-            carga3_val = float(carga3.get())
+
+        # Mejorar margen dinámico
             x3, y3 = parsear_coordenadas(carga3_xy.get())
             cargas.append((carga3_val, x3, y3))
         except (ValueError, AttributeError):
