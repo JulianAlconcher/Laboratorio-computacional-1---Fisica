@@ -554,7 +554,7 @@ def graficar_superficies_equipotenciales(cargas, rango=(-5, 5), num_puntos=100, 
     y = np.linspace(rango[0], rango[1], num_puntos)
     X, Y = np.meshgrid(x, y)
 
-    # 3. Vectorizar el cálculo del potencial para mayor eficiencia
+    # Vectorizar el cálculo del potencial para mayor eficiencia
     V = np.zeros_like(X)
     for carga, x_carga, y_carga in cargas:
         dx = X - x_carga
