@@ -38,6 +38,65 @@ def calcular_campo_electrico(carga, x_carga, y_carga, x_punto, y_punto):
     
     return Ex, Ey
 
+def calcular_potencial_electrico(carga, x_carga, y_carga, x_punto, y_punto):
+    """
+    Calcula el potencial eléctrico debido a una carga puntual en un punto específico.
+    
+    Parámetros:
+    - carga: magnitud de la carga [C]
+    - x_carga, y_carga: posición de la carga [m]
+    - x_punto, y_punto: punto donde se calcula el potencial [m]
+    
+    Retorna: V - potencial eléctrico [V]
+    """
+    # Calcular la distancia entre la carga y el punto
+    dx = x_punto - x_carga
+    dy = y_punto - y_carga
+    r = np.sqrt(dx**2 + dy**2)
+    
+    # Evitar división por cero
+    if r == 0:
+        return float('inf') if carga > 0 else float('-inf')
+    
+    # Calcular el potencial eléctrico usando V = k*q/r
+    V = K * carga / r
+    
+    return V
+
+def calcular_potencial_total(cargas, x_punto, y_punto):
+    """
+    Calcula el potencial eléctrico total en un punto debido a múltiples cargas.
+    Aplica el principio de superposición.
+    
+    Parámetros:
+    - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
+    - x_punto, y_punto: punto donde se calcula el potencial [m]
+    
+    Retorna: V_total - potencial eléctrico total [V]
+    """
+    V_total = 0.0
+    distancia_minima = 1e-6  # Distancia mínima para evitar singularidades (1 micrómetro)
+    
+    # Aplicar principio de superposición
+    for carga, x_carga, y_carga in cargas:
+        # Calcular distancia
+        dx = x_punto - x_carga
+        dy = y_punto - y_carga
+        r = np.sqrt(dx**2 + dy**2)
+        
+        # Si el punto está muy cerca de una carga, usar distancia mínima
+        if r < distancia_minima:
+            if r == 0:
+                return float('inf') if carga > 0 else float('-inf')
+            else:
+                r = distancia_minima
+        
+        # Calcular potencial de esta carga
+        V = K * carga / r
+        V_total += V
+    
+    return V_total
+
 def calcular_campo_total(cargas, x_punto, y_punto):
     """
     Calcula el campo eléctrico total en un punto debido a múltiples cargas.
@@ -96,6 +155,21 @@ def formatear_resultado(Ex, Ey, magnitud, angulo):
     resultado += f"Ey = {Ey:.2e} N/C\n"
     resultado += f"Magnitud = {magnitud:.2e} N/C\n"
     resultado += f"Ángulo = {angulo:.1f}°"
+    
+    return resultado
+
+def formatear_resultado_potencial(V_total):
+    """
+    Formatea el resultado del potencial eléctrico para mostrar en la interfaz.
+    
+    Retorna: string formateado con el resultado
+    """
+    if np.isinf(V_total):
+        resultado = "Potencial Eléctrico:\n"
+        resultado += "V = ∞ (punto coincide con una carga)"
+    else:
+        resultado = "Potencial Eléctrico:\n"
+        resultado += f"V = {V_total:.2e} V"
     
     return resultado
 
@@ -459,3 +533,190 @@ def graficar_lineas_campo(cargas, x_punto, y_punto, rango=(-3, 3), resolucion=20
     plt.close()
     
     return filepath
+
+def graficar_potencial_electrico(cargas, x_punto, y_punto, rango=(-3, 3), resolucion=100):
+    """
+    Genera el gráfico de curvas equipotenciales y mapa de potencial eléctrico.
+    
+    Parámetros:
+    - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
+    - x_punto, y_punto: punto donde se calculó el potencial
+    - rango: tupla (min, max) para el rango del gráfico
+    - resolucion: número de puntos por lado para el grid
+    
+    Retorna: path del archivo guardado
+    """
+    # Crear grid de puntos
+    x = np.linspace(rango[0], rango[1], resolucion)
+    y = np.linspace(rango[0], rango[1], resolucion)
+    X, Y = np.meshgrid(x, y)
+    
+    # Calcular potencial en cada punto del grid
+    V = np.zeros_like(X)
+    for i in range(resolucion):
+        for j in range(resolucion):
+            V_punto = calcular_potencial_total(cargas, X[i,j], Y[i,j])
+            # Limitar valores extremos para mejor visualización
+            if np.isinf(V_punto) or np.isnan(V_punto):
+                # Marcar puntos muy cercanos a las cargas como NaN
+                V[i,j] = np.nan
+            else:
+                # Aplicar una función de saturación suave para valores extremos
+                if abs(V_punto) > 1e5:
+                    V[i,j] = np.sign(V_punto) * (1e5 + np.log10(abs(V_punto)/1e5) * 1e4)
+                else:
+                    V[i,j] = V_punto
+    
+    # Crear la figura
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+    fig.suptitle('Potencial Eléctrico V(x,y)', fontsize=16, fontweight='bold')
+    
+    # Primer subplot: Mapa de calor del potencial
+    ax1.set_title('Mapa de Potencial (Colores)')
+    
+    # Usar una escala logarítmica suave para mejor visualización
+    V_plot = np.copy(V)
+    V_plot[np.isnan(V_plot)] = 0  # Reemplazar NaN con 0 temporalmente para el gráfico
+    
+    im = ax1.imshow(V_plot, extent=[rango[0], rango[1], rango[0], rango[1]], 
+                    origin='lower', cmap='RdBu_r', aspect='equal')
+    
+    # Agregar barra de color
+    cbar = plt.colorbar(im, ax=ax1)
+    cbar.set_label('Potencial [V]', fontsize=12)
+    
+    # Marcar las cargas
+    for i, (q, x_carga, y_carga) in enumerate(cargas):
+        color = 'red' if q > 0 else 'blue'
+        symbol = '+' if q > 0 else '-'
+        ax1.plot(x_carga, y_carga, 'o', color=color, markersize=12, 
+                markeredgecolor='black', linewidth=2)
+        ax1.text(x_carga, y_carga, symbol, ha='center', va='center', 
+                fontsize=16, fontweight='bold', color='white')
+        ax1.text(x_carga, y_carga + 0.2, f'q{i+1}={q:.1e}C', 
+                ha='center', va='bottom', fontsize=10, 
+                bbox=dict(boxstyle="round,pad=0.3", facecolor=color, alpha=0.3))
+    
+    # Marcar el punto de cálculo
+    if rango[0] <= x_punto <= rango[1] and rango[0] <= y_punto <= rango[1]:
+        ax1.plot(x_punto, y_punto, 'ko', markersize=8, 
+                markeredgecolor='yellow', linewidth=2)
+        V_calc = calcular_potencial_total(cargas, x_punto, y_punto)
+        ax1.text(x_punto, y_punto + 0.15, f'P({x_punto}, {y_punto})\nV={V_calc:.2e}V', 
+                ha='center', va='bottom', fontsize=10, 
+                bbox=dict(boxstyle="round,pad=0.3", facecolor='yellow', alpha=0.7))
+    
+    ax1.set_xlabel('x [m]', fontsize=12)
+    ax1.set_ylabel('y [m]', fontsize=12)
+    ax1.grid(True, alpha=0.3)
+    
+    # Segundo subplot: Curvas equipotenciales
+    ax2.set_title('Curvas Equipotenciales')
+    
+    # Calcular niveles de potencial para las curvas equipotenciales
+    V_clean = V[~np.isnan(V)]
+    if len(V_clean) > 0:
+        V_min, V_max = np.percentile(V_clean, [10, 90])  # Usar percentiles para evitar valores extremos
+        
+        # Generar niveles de potencial
+        if V_max > V_min and abs(V_max - V_min) > 1e-10:
+            # Crear niveles lineales bien distribuidos
+            niveles = np.linspace(V_min, V_max, 20)
+            
+            # Asegurar que los niveles sean únicos y estén ordenados
+            niveles = np.unique(niveles)
+            
+            # Si hay muy pocos niveles únicos, crear más
+            if len(niveles) < 5:
+                niveles = np.linspace(V_min, V_max, 15)
+                niveles = np.unique(niveles)
+        else:
+            # Si V_min y V_max son muy similares, crear niveles alrededor del valor medio
+            V_medio = (V_min + V_max) / 2
+            delta = max(abs(V_medio) * 0.1, 1e-6)  # 10% del valor medio o un mínimo
+            niveles = np.linspace(V_medio - delta, V_medio + delta, 10)
+        
+        # Dibujar curvas equipotenciales solo si hay niveles válidos
+        try:
+            if len(niveles) > 1 and np.all(np.diff(niveles) > 0):  # Verificar que los niveles estén ordenados
+                contour = ax2.contour(X, Y, V, levels=niveles, colors='black', linewidths=1, alpha=0.7)
+                ax2.clabel(contour, inline=True, fontsize=8, fmt='%.1e')
+                
+                # Agregar contornos rellenos de fondo
+                ax2.contourf(X, Y, V, levels=50, cmap='RdBu_r', alpha=0.6)
+            else:
+                # Si no se pueden crear contornos, solo mostrar el mapa de colores
+                ax2.text(0.5, 0.5, 'Contornos no disponibles\n(valores muy uniformes)', 
+                        transform=ax2.transAxes, ha='center', va='center',
+                        bbox=dict(boxstyle="round,pad=0.5", facecolor='yellow', alpha=0.7))
+        except Exception as e:
+            print(f"Error creando contornos: {e}")
+            # Mostrar solo el mapa de colores sin contornos
+            ax2.text(0.5, 0.5, 'Error en contornos\nMostrando solo mapa de colores', 
+                    transform=ax2.transAxes, ha='center', va='center',
+                    bbox=dict(boxstyle="round,pad=0.5", facecolor='orange', alpha=0.7))
+    
+    # Marcar las cargas
+    for i, (q, x_carga, y_carga) in enumerate(cargas):
+        color = 'red' if q > 0 else 'blue'
+        symbol = '+' if q > 0 else '-'
+        ax2.plot(x_carga, y_carga, 'o', color=color, markersize=12, 
+                markeredgecolor='black', linewidth=2)
+        ax2.text(x_carga, y_carga, symbol, ha='center', va='center', 
+                fontsize=16, fontweight='bold', color='white')
+    
+    # Marcar el punto de cálculo
+    if rango[0] <= x_punto <= rango[1] and rango[0] <= y_punto <= rango[1]:
+        ax2.plot(x_punto, y_punto, 'ko', markersize=8, 
+                markeredgecolor='yellow', linewidth=3)
+    
+    ax2.set_xlabel('x [m]', fontsize=12)
+    ax2.set_ylabel('y [m]', fontsize=12)
+    ax2.grid(True, alpha=0.3)
+    ax2.set_aspect('equal')
+    ax2.set_xlim(rango)
+    ax2.set_ylim(rango)
+    
+    plt.tight_layout()
+    
+    # Guardar en la carpeta graphics
+    graphics_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'graphics')
+    if not os.path.exists(graphics_dir):
+        os.makedirs(graphics_dir)
+    
+    filename = 'potencial_electrico.png'
+    filepath = os.path.join(graphics_dir, filename)
+    
+    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return filepath
+
+def calcular_potencial_en_linea(cargas, x_inicio, x_fin, y_fijo=0, num_puntos=1000):
+    """
+    Calcula el potencial eléctrico a lo largo de una línea.
+    
+    Parámetros:
+    - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
+    - x_inicio, x_fin: rango x para el cálculo
+    - y_fijo: valor fijo de y (por defecto 0 para el eje x)
+    - num_puntos: número de puntos para el cálculo
+    
+    Retorna: (x_values, V_values) arrays de posición y potencial
+    """
+    x_values = np.linspace(x_inicio, x_fin, num_puntos)
+    V_values = []
+    
+    for x in x_values:
+        V = calcular_potencial_total(cargas, x, y_fijo)
+        # Limitar valores extremos
+        if np.isinf(V):
+            V_values.append(np.nan)
+        elif V > 1e6:
+            V_values.append(1e6)
+        elif V < -1e6:
+            V_values.append(-1e6)
+        else:
+            V_values.append(V)
+    
+    return x_values, np.array(V_values)
