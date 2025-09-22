@@ -2,7 +2,7 @@
 from logging import root
 from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Text, Scrollbar, Canvas, Scale, HORIZONTAL
 from tkinter.ttk import Separator
-from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio, graficar_lineas_campo, calcular_potencial_total
+from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio, graficar_lineas_campo, calcular_potencial_total, graficar_potencial
 from PIL import Image, ImageTk
 import os
 import json
@@ -549,103 +549,120 @@ def mostrar_resultado_potencial_numerico(cargas, x_punto, y_punto, V_total):
 
 def calcular_potencial():
     """
-    Calcula el potencial eléctrico V(x,y) en el punto especificado (solo resultado numérico).
+    Calcula el potencial eléctrico V(x,y) en el punto especificado y muestra ventana con gráfico.
     """
     print("DEBUG: Función calcular_potencial llamada")
 
-    # Obtener valores de las cargas (igual validación que para campo eléctrico)
+    # Obtener valores de las cargas
     carga1_val = carga1.get().strip()
     carga2_val = carga2.get().strip()
     carga3_val = carga3.get().strip()
-    
-    print(f"DEBUG: Valores de cargas obtenidos: {carga1_val}, {carga2_val}, {carga3_val}")
-    
-    # Verificar que todos los campos de cargas estén llenos
+
     if not all([carga1_val, carga2_val, carga3_val]):
         messagebox.showerror("Error", "Por favor ingrese valores para todas las cargas")
         return
-    
-    # Validar las cargas
+
     es_valido, mensaje = validar_cargas(carga1_val, carga2_val, carga3_val)
-    
     if not es_valido:
         messagebox.showerror("Error de validación", mensaje)
         return
-    
-    print("DEBUG: Cargas validadas correctamente")
-    
-    # Obtener coordenadas de las cargas
+
     try:
-        coord1_str = carga1_xy.get().strip()
-        coord2_str = carga2_xy.get().strip()
-        coord3_str = carga3_xy.get().strip()
-        
-        if not all([coord1_str, coord2_str, coord3_str]):
-            messagebox.showerror("Error", "Por favor ingrese las coordenadas de todas las cargas")
-            return
-            
-        x1, y1 = parsear_coordenadas(coord1_str)
-        x2, y2 = parsear_coordenadas(coord2_str)
-        x3, y3 = parsear_coordenadas(coord3_str)
-        
-        print(f"DEBUG: Coordenadas parseadas: ({x1},{y1}), ({x2},{y2}), ({x3},{y3})")
-        
+        x1, y1 = parsear_coordenadas(carga1_xy.get().strip())
+        x2, y2 = parsear_coordenadas(carga2_xy.get().strip())
+        x3, y3 = parsear_coordenadas(carga3_xy.get().strip())
     except ValueError as e:
-        messagebox.showerror("Error de coordenadas", f"Error en coordenadas de cargas: {str(e)}")
+        messagebox.showerror("Error de coordenadas", str(e))
         return
-    
-    # Obtener punto donde calcular el potencial
+
     try:
-        punto_str = entry_punto.get().strip()
-        if not punto_str:
-            messagebox.showerror("Error", "Por favor ingrese el punto donde calcular el potencial")
-            return
-            
-        x_punto, y_punto = parsear_coordenadas(punto_str)
-        print(f"DEBUG: Punto de cálculo: ({x_punto}, {y_punto})")
-        
+        x_punto, y_punto = parsear_coordenadas(entry_punto.get().strip())
     except ValueError as e:
-        messagebox.showerror("Error de punto", f"Error en punto de entrada: {str(e)}")
+        messagebox.showerror("Error de punto", str(e))
         return
-    
-    # Convertir cargas a float
+
     try:
         q1 = float(carga1_val)
         q2 = float(carga2_val)
         q3 = float(carga3_val)
-        print(f"DEBUG: Cargas convertidas: {q1}, {q2}, {q3}")
     except ValueError:
         messagebox.showerror("Error", "Error al convertir cargas a números")
         return
-    
-    # Crear lista de cargas para el cálculo
-    cargas = [
-        (q1, x1, y1),
-        (q2, x2, y2),
-        (q3, x3, y3)
-    ]
-    
-    print(f"DEBUG: Lista de cargas creada: {cargas}")
-    
-    # Calcular el potencial eléctrico total en el punto especificado
+
+    cargas = [(q1, x1, y1), (q2, x2, y2), (q3, x3, y3)]
+
     try:
         print("DEBUG: Iniciando cálculo de potencial...")
         V_total = calcular_potencial_total(cargas, x_punto, y_punto)
         print(f"DEBUG: Potencial calculado = {V_total}")
-        
-        # Mostrar resultado numérico solo en una ventana emergente
-        print("DEBUG: Llamando a mostrar_resultado_potencial_numerico...")
-        mostrar_resultado_potencial_numerico(cargas, x_punto, y_punto, V_total)
-        
-        print(f"Cargas: {cargas}")
-        print(f"Punto: ({x_punto}, {y_punto})")
-        print(f"Potencial eléctrico: V = {V_total:.2e} V")
-        
+
+       # Generar gráfico de potencial
+        imagen_potencial_path = graficar_potencial(cargas, x_punto, y_punto, rango_x=(-5, 5))
+
+        # Mostrar ventana con resultado y gráfico
+        mostrar_ventana_potencial_completa(cargas, x_punto, y_punto, V_total, imagen_potencial_path)
+
+
     except Exception as e:
         messagebox.showerror("Error de cálculo", f"Error al calcular el potencial eléctrico: {str(e)}")
         print(f"ERROR: {e}")
         import traceback
         traceback.print_exc()
+
+def mostrar_ventana_potencial_completa(cargas, x_punto, y_punto, V_total, imagen_path):
+    ventana = Toplevel()
+    ventana.title("Resultados - Potencial Eléctrico")
+    ventana.geometry("1100x700")
+    ventana.configure(bg="#fdfdfd")
+    ventana.resizable(False, False)
+
+    main_frame = Frame(ventana, bg="#fdfdfd")
+    main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+    # ===== IZQUIERDA: datos y resultado =====
+    left_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
+    left_frame.pack(side="left", fill="y", padx=(0, 15), ipadx=20, ipady=20)
+
+    Label(left_frame, text="Configuración de Cargas", font=("Arial", 16, "bold"),
+          bg="white", fg="black").pack(pady=(10, 20))
+
+    for i, (carga, x, y) in enumerate(cargas, 1):
+        Label(left_frame, text=f"• Carga {i}: {carga:.2e} C en ({x},{y}) m",
+              font=("Arial", 12), bg="white").pack(anchor="w", padx=15)
+
+    Label(left_frame, text=f"Punto: ({x_punto}, {y_punto}) m",
+          font=("Arial", 12, "bold"), bg="white", fg="#2c3e50").pack(pady=(20, 10))
+
+    if np.isinf(V_total):
+        Label(left_frame, text="V = ∞ (punto coincide con carga)",
+              font=("Arial", 14, "bold"), bg="white", fg="red").pack(pady=10)
+    else:
+        Label(left_frame, text=f"V = {V_total:.6e} V",
+              font=("Arial", 16, "bold"), bg="white", fg="#27ae60").pack(pady=10)
+
+    # ===== DERECHA: gráfico =====
+    right_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
+    right_frame.pack(side="right", fill="both", expand=True)
+
+    try:
+        img = Image.open(imagen_path)
+        img.thumbnail((850, 600))
+        photo = ImageTk.PhotoImage(img)
+
+        canvas = Canvas(right_frame, bg="white", width=img.width, height=img.height, highlightthickness=0)
+        canvas.pack()
+        canvas.create_image(img.width//2, img.height//2, image=photo)
+
+        photo_references.append(photo)
+    except Exception as e:
+        Label(right_frame, text=f"Error cargando gráfico: {str(e)}",
+              font=("Arial", 12), bg="white", fg="red").pack(pady=30)
+
+    Button(ventana, text="Cerrar", command=ventana.destroy,
+           font=("Arial", 14, "bold"), bg="#f0f0f0",
+           activebackground="#cfcfcf", width=15).pack(side="bottom", pady=15)
+
+
 
 def calcular_potencial_predeterminado():
     """

@@ -620,6 +620,74 @@ def graficar_superficies_equipotenciales(cargas, rango=(-5, 5), num_puntos=100, 
     plt.close()
     
     return filename
+=======
+def graficar_potencial(cargas, x_punto, y_punto, rango_x=(-5, 5), num_puntos=1000):
+    x_values = np.linspace(rango_x[0], rango_x[1], num_puntos)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    fig.suptitle('Potencial Eléctrico V(x) vs x', fontsize=16, fontweight='bold')
+
+    colors = ['red', 'blue', 'green']
+    todos_valores = []  # acá guardamos todos los valores para calcular min y max global
+
+    # ---- Potenciales individuales ----
+    ax1.set_title("Potenciales Individuales")
+    for i, (carga, x_carga, y_carga) in enumerate(cargas):
+        V_values = []
+        for x in x_values:
+            V = calcular_potencial_electrico(carga, x_carga, y_carga, x, 0)
+            if np.isinf(V):
+                V = np.nan
+            V_values.append(V)
+        V_values = np.array(V_values)
+        todos_valores.extend(V_values[~np.isnan(V_values)])  # agregamos valores finitos
+        ax1.plot(x_values, V_values, color=colors[i], linewidth=2,
+                 label=f'Carga {i+1}: q={carga:.1e} C en ({x_carga},{y_carga})')
+        ax1.axvline(x=x_carga, color=colors[i], linestyle='--', alpha=0.5)
+
+    ax1.set_xlabel("x [m]")
+    ax1.set_ylabel("V(x) [Voltios]")
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    ax1.axhline(y=0, color="black", linewidth=0.5)
+
+    # ---- Superposición total ----
+    ax2.set_title("Superposición de Potenciales")
+    V_total_values = []
+    for x in x_values:
+        Vt = calcular_potencial_total(cargas, x, 0)
+        if np.isinf(Vt):
+            Vt = np.nan
+        V_total_values.append(Vt)
+    V_total_values = np.array(V_total_values)
+    todos_valores.extend(V_total_values[~np.isnan(V_total_values)])
+
+    ax2.plot(x_values, V_total_values, color="orange", linewidth=2,
+             label="Potencial Total (Superposición)")
+    ax2.set_xlabel("x [m]")
+    ax2.set_ylabel("V(x) [Voltios]")
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    ax2.axhline(y=0, color="black", linewidth=0.8)
+
+    # ---- Ajustar misma escala en y ----
+    if todos_valores:
+        y_min, y_max = min(todos_valores), max(todos_valores)
+        ax1.set_ylim(y_min, y_max)
+        ax2.set_ylim(y_min, y_max)
+
+    plt.tight_layout()
+
+    graphics_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'graphics')
+    if not os.path.exists(graphics_dir):
+        os.makedirs(graphics_dir)
+
+    filepath = os.path.join(graphics_dir, "potencial_vs_x.png")
+    plt.savefig(filepath, dpi=300, bbox_inches="tight")
+    plt.close()
+
+    return filepath
+
 
 def calcular_potencial_en_linea(cargas, x_inicio, x_fin, y_fijo=0, num_puntos=1000):
     """
