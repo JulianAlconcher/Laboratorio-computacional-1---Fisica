@@ -6,7 +6,6 @@ from fileinput import filename
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import datetime
 from scipy.optimize import brentq
 from scipy.integrate import odeint
 
@@ -529,8 +528,7 @@ def graficar_lineas_campo(cargas, x_punto, y_punto, rango=(-3, 3), resolucion=20
     os.makedirs(graphics_dir, exist_ok=True)
 
     # Guardar la figura
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'lineas_campo_{timestamp}.png'
+    filename = 'lineas_campo.png'
     filepath = os.path.join(graphics_dir, filename)
     plt.tight_layout()
     plt.savefig(filepath, dpi=300, bbox_inches='tight')
@@ -608,14 +606,14 @@ def graficar_superficies_equipotenciales(cargas, rango=(-5, 5), num_puntos=100, 
     os.makedirs(graphics_dir, exist_ok=True)
 
     # Guardar la figura
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'equipotenciales_{timestamp}.png'
+    graphics_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'graphics')
+    if not os.path.exists(graphics_dir):
+        os.makedirs(graphics_dir)
+    
+    filename = 'equipotenciales.png'
     filepath = os.path.join(graphics_dir, filename)
     plt.tight_layout()
     plt.savefig(filepath, dpi=300, bbox_inches='tight')
-    plt.close()
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
     return filepath
     
