@@ -598,9 +598,25 @@ def calcular_potencial():
 
        # Generar gráfico de potencial
         imagen_potencial_path = graficar_potencial(cargas, x_punto, y_punto, rango_x=(-5, 5))
+        
+        # Generar gráfico de superficies equipotenciales
+        from logic import graficar_superficies_equipotenciales
+        
+        # Calcular el rango apropiado para las equipotenciales
+        x_vals = [x for _, x, _ in cargas]
+        y_vals = [y for _, _, y in cargas]
+        margen = 2.0
+        x_min, x_max = min(x_vals) - margen, max(x_vals) + margen
+        y_min, y_max = min(y_vals) - margen, max(y_vals) + margen
+        rango_max = max(x_max - x_min, y_max - y_min) / 2
+        centro_x = (min(x_vals) + max(x_vals)) / 2
+        centro_y = (min(y_vals) + max(y_vals)) / 2
+        rango = (centro_x - rango_max - margen, centro_x + rango_max + margen)
+        
+        imagen_equipotenciales_path = graficar_superficies_equipotenciales(cargas, rango=rango)
 
-        # Mostrar ventana con resultado y gráfico
-        mostrar_ventana_potencial_completa(cargas, x_punto, y_punto, V_total, imagen_potencial_path)
+        # Mostrar ventana con resultado y ambos gráficos
+        mostrar_ventana_potencial_completa(cargas, x_punto, y_punto, V_total, imagen_potencial_path, imagen_equipotenciales_path)
 
 
     except Exception as e:
@@ -609,67 +625,244 @@ def calcular_potencial():
         import traceback
         traceback.print_exc()
 
-def mostrar_ventana_potencial_completa(cargas, x_punto, y_punto, V_total, imagen_path):
+def mostrar_ventana_potencial_completa(cargas, x_punto, y_punto, V_total, imagen_path, imagen_equipotenciales_path):
     ventana = Toplevel()
     ventana.title("Resultados - Potencial Eléctrico")
-    ventana.geometry("1100x700")
+    ventana.geometry("1100x900")
     ventana.configure(bg="#fdfdfd")
     ventana.resizable(False, False)
 
+    # Frame principal
     main_frame = Frame(ventana, bg="#fdfdfd")
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-    # ===== IZQUIERDA: datos y resultado =====
+    # ===== IZQUIERDA (Texto) =====
     left_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
     left_frame.pack(side="left", fill="y", padx=(0, 15), ipadx=20, ipady=20)
 
-    Label(left_frame, text="Configuración de Cargas", font=("Arial", 16, "bold"),
-          bg="white", fg="black").pack(pady=(10, 20))
+    # Título principal
+    Label(left_frame, text="Configuración de Cargas", 
+          font=("Arial", 16, "bold"), bg="white", fg="black").pack(pady=(10, 20))
 
+    # Información de cada carga
     for i, (carga, x, y) in enumerate(cargas, 1):
-        Label(left_frame, text=f"• Carga {i}: {carga:.2e} C en ({x},{y}) m",
-              font=("Arial", 12), bg="white").pack(anchor="w", padx=15)
+        # Frame para cada carga
+        carga_frame = Frame(left_frame, bg="#f8f9fa", relief="solid", bd=1)
+        carga_frame.pack(fill="x", padx=10, pady=5)
+        
+        Label(carga_frame, text=f"Carga {i}:", 
+              font=("Arial", 12, "bold"), bg="#f8f9fa", fg="black").pack(anchor="w", padx=10, pady=(5,0))
+        Label(carga_frame, text=f"Valor: {carga:.2e} C", 
+              font=("Arial", 11), bg="#f8f9fa", fg="black").pack(anchor="w", padx=20)
+        Label(carga_frame, text=f"Posición: ({x}, {y}) m", 
+              font=("Arial", 11), bg="#f8f9fa", fg="black").pack(anchor="w", padx=20, pady=(0,5))
 
-    Label(left_frame, text=f"Punto: ({x_punto}, {y_punto}) m",
-          font=("Arial", 12, "bold"), bg="white", fg="#2c3e50").pack(pady=(20, 10))
+    # Punto de cálculo
+    Label(left_frame, text="Punto de Cálculo:", 
+          font=("Arial", 14, "bold"), bg="white", fg="black").pack(anchor="w", padx=10, pady=(25,5))
+    
+    punto_frame = Frame(left_frame, bg="#e8f4fd", relief="solid", bd=1)
+    punto_frame.pack(fill="x", padx=10, pady=5)
+    Label(punto_frame, text=f"Coordenadas: ({x_punto}, {y_punto}) m", 
+          font=("Arial", 12), bg="#e8f4fd", fg="black").pack(anchor="w", padx=15, pady=8)
 
+    # Separador visual
+    separator = Frame(left_frame, height=2, bg="#bdc3c7")
+    separator.pack(fill="x", padx=10, pady=20)
+
+    # Resultados del potencial eléctrico
+    Label(left_frame, text="Resultado del Potencial Eléctrico:", 
+          font=("Arial", 14, "bold"), bg="white", fg="black").pack(anchor="w", padx=10, pady=(5,10))
+
+    # Frame para los resultados
+    resultado_frame = Frame(left_frame, bg="#f0f8ff", relief="solid", bd=2)
+    resultado_frame.pack(fill="x", padx=10, pady=5)
+
+    # Valor del potencial
+    Label(resultado_frame, text="Valor del Potencial:", 
+          font=("Arial", 12, "bold"), bg="#f0f8ff", fg="black").pack(anchor="w", padx=15, pady=(10,5))
+    
     if np.isinf(V_total):
-        Label(left_frame, text="V = ∞ (punto coincide con carga)",
-              font=("Arial", 14, "bold"), bg="white", fg="red").pack(pady=10)
+        Label(resultado_frame, text="• V = ∞ V (punto coincide con carga)", 
+              font=("Arial", 11), bg="#f0f8ff", fg="red").pack(anchor="w", padx=25)
     else:
-        Label(left_frame, text=f"V = {V_total:.6e} V",
-              font=("Arial", 16, "bold"), bg="white", fg="#27ae60").pack(pady=10)
+        Label(resultado_frame, text=f"• V = {V_total:.6e} V", 
+              font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25)
 
-    # ===== DERECHA: gráfico =====
+    # Información de la fórmula
+    Label(resultado_frame, text="Fórmula utilizada:", 
+          font=("Arial", 12, "bold"), bg="#f0f8ff", fg="black").pack(anchor="w", padx=15, pady=(10,5))
+    
+    Label(resultado_frame, text="• V = Σ(k·qi/ri)", 
+          font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25)
+    Label(resultado_frame, text="• k = 8.99×10⁹ N·m²/C²", 
+          font=("Arial", 11), bg="#f0f8ff", fg="black").pack(anchor="w", padx=25, pady=(0,10))
+
+    # Información adicional sobre potencial
+    info_frame = Frame(left_frame, bg="#fff0f5", relief="solid", bd=2)
+    info_frame.pack(fill="x", padx=10, pady=(15,5))
+
+    Label(info_frame, text="Interpretación Física:", 
+          font=("Arial", 12, "bold"), bg="#fff0f5", fg="black").pack(anchor="w", padx=15, pady=(10,5))
+    
+    interpretacion = ("• Potencial > 0: trabajo requerido\n"
+                     "  para traer carga + desde infinito\n"
+                     "• Potencial < 0: trabajo liberado\n"
+                     "  al traer carga + desde infinito")
+    
+    Label(info_frame, text=interpretacion, 
+          font=("Arial", 10), bg="#fff0f5", fg="#8b4513", justify="left").pack(anchor="w", padx=25, pady=(0,10))
+
+    # ===== DERECHA (Gráfico con Slider) =====
     right_frame = Frame(main_frame, bg="white", relief="solid", bd=2)
     right_frame.pack(side="right", fill="both", expand=True)
 
-    try:
-        img = Image.open(imagen_path)
-        img.thumbnail((850, 600))
-        photo = ImageTk.PhotoImage(img)
+    # Frame para el control de gráficos
+    control_frame = Frame(right_frame, bg="white")
+    control_frame.pack(fill="x", padx=10, pady=10)
 
-        canvas = Canvas(right_frame, bg="white", width=img.width, height=img.height, highlightthickness=0)
-        canvas.pack()
-        canvas.create_image(img.width//2, img.height//2, image=photo)
+    # Variable para rastrear el gráfico actual
+    grafico_actual = {"valor": 0}  # 0 = V(x,y) superficial, 1 = Equipotenciales
+    
+    def cambiar_grafico_potencial(tipo_grafico):
+        """Función que cambia el gráfico según el tipo seleccionado"""
+        try:
+            # Actualizar el valor actual
+            grafico_actual["valor"] = tipo_grafico
+            
+            # Limpiar el canvas anterior
+            for widget in canvas_frame.winfo_children():
+                widget.destroy()
+            
+            # Seleccionar imagen según el tipo de gráfico
+            if tipo_grafico == 0:
+                imagen_actual = imagen_path
+                titulo_actual = "V(x,y) - Potencial Eléctrico 2D"
+                # Actualizar estilo de botones
+                btn_potencial_2d.config(bg="#4CAF50", fg="black", relief="solid", bd=2)
+                btn_equipotenciales.config(bg="#f0f0f0", fg="black", relief="raised", bd=1)
+            else:
+                imagen_actual = imagen_equipotenciales_path
+                titulo_actual = "Superficies Equipotenciales"
+                # Actualizar estilo de botones
+                btn_potencial_2d.config(bg="#f0f0f0", fg="black", relief="raised", bd=1)
+                btn_equipotenciales.config(bg="#4CAF50", fg="black", relief="solid", bd=2)
+            
+            # Actualizar título
+            titulo_grafico.config(text=titulo_actual)
+            
+            # Cargar y mostrar la nueva imagen
+            img = Image.open(imagen_actual)
+            img.thumbnail((850, 600))
+            photo = ImageTk.PhotoImage(img)
+            
+            canvas = Canvas(canvas_frame, bg="white", 
+                           width=img.width, height=img.height, 
+                           highlightthickness=0)
+            canvas.pack()
+            canvas.create_image(img.width//2, img.height//2, image=photo)
+            
+            # Mantener referencia para evitar garbage collection
+            photo_references.append(photo)
+            
+        except Exception as e:
+            # Mostrar error si no se puede cargar la imagen
+            Label(canvas_frame, text=f"Error cargando gráfico: {str(e)}", 
+                  font=("Arial", 12), bg="white", fg="red").pack(pady=30)
 
-        photo_references.append(photo)
-    except Exception as e:
-        Label(right_frame, text=f"Error cargando gráfico: {str(e)}",
-              font=("Arial", 12), bg="white", fg="red").pack(pady=30)
+    # Título del gráfico (dinámico)
+    titulo_grafico = Label(control_frame, text="V(x,y) - Potencial Eléctrico 2D", 
+                          font=("Arial", 16, "bold"), bg="white", fg="#2c3e50")
+    titulo_grafico.pack(pady=(0, 15))
 
+    # Frame para los botones de selección
+    botones_frame = Frame(control_frame, bg="white")
+    botones_frame.pack(pady=5)
+    
+    # Botón para gráfico V(x,y) 2D
+    btn_potencial_2d = Button(botones_frame, text="📊 V(x,y) 2D", 
+                        command=lambda: cambiar_grafico_potencial_con_descripcion(0),
+                        font=("Arial", 12, "bold"), 
+                        bg="#4CAF50", fg="black",
+                        relief="solid", bd=2,
+                        padx=20, pady=8,
+                        cursor="hand2")
+    btn_potencial_2d.pack(side="left", padx=5)
+    
+    # Botón para superficies equipotenciales
+    btn_equipotenciales = Button(botones_frame, text="🗺️ Equipotenciales", 
+                       command=lambda: cambiar_grafico_potencial_con_descripcion(1),
+                       font=("Arial", 12, "bold"), 
+                       bg="#f0f0f0", fg="black",
+                       relief="raised", bd=1,
+                       padx=20, pady=8,
+                       cursor="hand2")
+    btn_equipotenciales.pack(side="left", padx=5)
+    
+    # Efectos hover para los botones
+    def on_enter_2d(e):
+        if grafico_actual["valor"] != 0:
+            btn_potencial_2d.config(bg="#45a049")
+    
+    def on_leave_2d(e):
+        if grafico_actual["valor"] != 0:
+            btn_potencial_2d.config(bg="#f0f0f0")
+    
+    def on_enter_equi(e):
+        if grafico_actual["valor"] != 1:
+            btn_equipotenciales.config(bg="#45a049")
+    
+    def on_leave_equi(e):
+        if grafico_actual["valor"] != 1:
+            btn_equipotenciales.config(bg="#f0f0f0")
+    
+    btn_potencial_2d.bind("<Enter>", on_enter_2d)
+    btn_potencial_2d.bind("<Leave>", on_leave_2d)
+    btn_equipotenciales.bind("<Enter>", on_enter_equi)
+    btn_equipotenciales.bind("<Leave>", on_leave_equi)
+
+    # Descripción de los gráficos
+    descripcion_frame = Frame(control_frame, bg="#f8f9fa", relief="solid", bd=1)
+    descripcion_frame.pack(fill="x", pady=(10, 5), padx=20)
+    
+    descripcion_label = Label(descripcion_frame, text="",
+                             font=("Arial", 10), bg="#f8f9fa", fg="#34495e",
+                             justify="left")
+    descripcion_label.pack(pady=5, padx=10)
+    
+    # Función para actualizar descripción
+    def actualizar_descripcion():
+        if grafico_actual["valor"] == 0:
+            descripcion_text = "• Muestra el potencial eléctrico V(x,y) como función 2D\n• Visualización superficial del potencial en el plano"
+        else:
+            descripcion_text = "• Curvas equipotenciales: líneas de potencial constante\n• El gradiente de V es perpendicular a estas líneas"
+        descripcion_label.config(text=descripcion_text)
+    
+    # Función combinada para cambiar gráfico y descripción
+    def cambiar_grafico_potencial_con_descripcion(tipo_grafico):
+        cambiar_grafico_potencial(tipo_grafico)
+        actualizar_descripcion()
+
+    # Frame para el canvas del gráfico
+    canvas_frame = Frame(right_frame, bg="white")
+    canvas_frame.pack(fill="both", expand=True, pady=10)
+
+    # Mostrar inicialmente el primer gráfico
+    cambiar_grafico_potencial_con_descripcion(0)
+
+    # ===== BOTÓN CERRAR =====
     Button(ventana, text="Cerrar", command=ventana.destroy,
-           font=("Arial", 14, "bold"), bg="#f0f0f0",
+           font=("Arial", 14, "bold"), bg="#f0f0f0", 
            activebackground="#cfcfcf", width=15).pack(side="bottom", pady=15)
 
 
 
 def calcular_potencial_predeterminado():
     """
-    Carga la configuración predeterminada y calcula el potencial automáticamente (solo en ventana emergente).
+    Carga la configuración predeterminada y calcula el potencial automáticamente con ventana completa.
     """
     cargar_configuracion_predeterminada()
-    calcular_potencial_solo_ui()
+    calcular_potencial()
 
 def graficar_equipotenciales():
     """
