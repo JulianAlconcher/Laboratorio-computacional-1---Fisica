@@ -716,3 +716,94 @@ def calcular_potencial_en_linea(cargas, x_inicio, x_fin, y_fijo=0, num_puntos=10
             V_values.append(V)
     
     return x_values, np.array(V_values)
+
+def graficar_superposicion_equipotenciales_y_campo(
+    cargas,
+    rango=(-5, 5),
+    num_puntos=250,
+    niveles=21
+):
+    """
+    Dibuja en la *misma* figura:
+      - Contornos de potencial (equipotenciales)
+      - Líneas de campo (streamlines del vector E)
+    De este modo se ve cómo se cortan a 90°.
+
+    Retorna: ruta absoluta del PNG guardado.
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import os, datetime
+
+    # malla
+    x = np.linspace(rango[0], rango[1], num_puntos)
+    y = np.linspace(rango[0], rango[1], num_puntos)
+    X, Y = np.meshgrid(x, y)
+
+    # potencial y campo total vectorizados
+    eps = 1e-9
+    V = np.zeros_like(X, dtype=float)
+    Ex = np.zeros_like(X, dtype=float)
+    Ey = np.zeros_like(Y, dtype=float)
+
+    for q, xc, yc in cargas:
+        dx = X - xc
+        dy = Y - yc
+        r2 = dx*dx + dy*dy + eps
+        r = np.sqrt(r2)
+
+        # V = k q / r
+        V += K * q / r
+
+        # E = k q (r_vec)/r^3  => componentes
+        Ex += K * q * dx / (r2 * r)
+        Ey += K * q * dy / (r2 * r)
+
+    # niveles de contorno simétricos e incluyendo 0 V
+    vmax = np.nanpercentile(V, 98)
+    vmin = np.nanpercentile(V, 2)
+    vmax_abs = max(abs(vmin), abs(vmax))
+    levels = np.linspace(-vmax_abs, vmax_abs, niveles)
+    if 0.0 not in levels:
+        levels = np.sort(np.append(levels, 0.0))
+
+    # figura
+    fig, ax = plt.subplots(figsize=(10, 9))
+    ax.set_aspect('equal')
+
+    # equipotenciales
+    cs = ax.contour(X, Y, V, levels=levels, colors='purple', linewidths=1.0)
+    ax.clabel(cs, fmt='%1.1f V', fontsize=8, inline=True)
+
+    # líneas de campo (streamplot)
+    strm = ax.streamplot(
+        X, Y, Ex, Ey,
+        density=1.2, linewidth=1.0, arrowsize=1.5, color='k'
+    )
+
+    # cargas
+    for i, (q, xc, yc) in enumerate(cargas, 1):
+        color = 'red' if q > 0 else 'blue'
+        ax.scatter(xc, yc, s=120, c=color, edgecolors='black', zorder=5)
+        ax.text(xc + 0.12, yc + 0.12, f'{q:.1e} C',
+                fontsize=9, bbox=dict(facecolor='white', alpha=0.75, edgecolor='none'))
+
+    ax.set_title('Equipotenciales + Líneas de Campo (⊥ en 90°)')
+    ax.set_xlabel('x [m]')
+    ax.set_ylabel('y [m]')
+    ax.grid(True, alpha=0.35)
+    ax.axhline(0, color='black', lw=0.6, alpha=0.6)
+    ax.axvline(0, color='black', lw=0.6, alpha=0.6)
+
+    # guardar
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    graphics_dir = os.path.join(project_root, 'graphics')
+    os.makedirs(graphics_dir, exist_ok=True)
+    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    fname = f'superposicion_E_y_equipot_{ts}.png'
+    fpath = os.path.join(graphics_dir, fname)
+    plt.tight_layout()
+    plt.savefig(fpath, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+
+    return fpath

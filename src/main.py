@@ -1,8 +1,7 @@
 
-from logging import root
-from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Text, Scrollbar, Canvas, Scale, HORIZONTAL
-from tkinter.ttk import Separator
-from logic import calcular_campo_total, parsear_coordenadas, formatear_resultado, graficar_campo_electrico, encontrar_puntos_equilibrio, analizar_estabilidad_equilibrio, graficar_lineas_campo, calcular_potencial_total, graficar_potencial
+from tkinter import Frame, Tk, Label, Entry, Button, messagebox, Toplevel, Canvas
+from logic import calcular_campo_total, parsear_coordenadas, graficar_campo_electrico, graficar_lineas_campo, calcular_potencial_total, graficar_potencial, graficar_superposicion_equipotenciales_y_campo
+
 from PIL import Image, ImageTk
 import os
 import json
@@ -14,9 +13,23 @@ photo_references = []
 def mostrar_ventana_resultados(cargas, x_punto, y_punto, Ex, Ey, magnitud, angulo, imagen_path, puntos_equilibrio, imagen_lineas_path):
     ventana = Toplevel()
     ventana.title("Resultados - Campo Eléctrico")
-    ventana.geometry("1100x900")
+
+    # Obtener dimensiones de la pantalla
+    screen_width = ventana.winfo_screenwidth()
+    screen_height = ventana.winfo_screenheight()
+
+    # Calcular dimensiones de la ventana de gráfico (aprox. 55% del ancho de pantalla)
+    graph_width = int(screen_width * 0.55)
+    graph_height = int(screen_height * 0.85)
+
+    # Posicionar a la derecha de la ventana principal
+    margin = 20
+    main_width = int(screen_width * 0.4)
+    x_position = main_width + margin * 2
+
+    ventana.geometry(f"{graph_width}x{graph_height}+{x_position}+{margin}")
     ventana.configure(bg="#fdfdfd")
-    ventana.resizable(False, False)  # Hacer la ventana no redimensionable
+    ventana.resizable(True, True)  # Hacer la ventana redimensionable
 
     # Frame principal
     main_frame = Frame(ventana, bg="#fdfdfd")
@@ -300,8 +313,7 @@ def cargar_configuracion_predeterminada():
         entry_punto.delete(0, 'end')
         entry_punto.insert(0, f"{punto_config['x']}, {punto_config['y']}")
         
-        messagebox.showinfo("Configuración cargada", 
-                          "Se ha cargado la configuración predeterminada exitosamente.")
+        print("Configuración predeterminada cargada exitosamente.")
         
     except FileNotFoundError:
         messagebox.showerror("Error", "No se encontró el archivo de configuración predeterminada.")
@@ -612,9 +624,23 @@ def calcular_potencial():
 def mostrar_ventana_potencial_completa(cargas, x_punto, y_punto, V_total, imagen_path):
     ventana = Toplevel()
     ventana.title("Resultados - Potencial Eléctrico")
-    ventana.geometry("1100x700")
+
+    # Obtener dimensiones de la pantalla
+    screen_width = ventana.winfo_screenwidth()
+    screen_height = ventana.winfo_screenheight()
+
+    # Calcular dimensiones de la ventana de gráfico (aprox. 55% del ancho de pantalla)
+    graph_width = int(screen_width * 0.55)
+    graph_height = int(screen_height * 0.85)
+
+    # Posicionar a la derecha de la ventana principal
+    margin = 20
+    main_width = int(screen_width * 0.4)
+    x_position = main_width + margin * 2
+
+    ventana.geometry(f"{graph_width}x{graph_height}+{x_position}+{margin}")
     ventana.configure(bg="#fdfdfd")
-    ventana.resizable(False, False)
+    ventana.resizable(True, True)
 
     main_frame = Frame(ventana, bg="#fdfdfd")
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -735,8 +761,7 @@ def graficar_equipotenciales():
             from logic import graficar_superficies_equipotenciales
             filepath = graficar_superficies_equipotenciales(cargas_filtradas, rango=rango)
             
-            # Mostrar mensaje de éxito
-            messagebox.showinfo("Éxito", f"Gráfico de superficies equipotenciales guardado en:\n{filepath}")
+            print(f"Gráfico de superficies equipotenciales guardado en: {filepath}")
             
             # Mostrar la imagen generada en una nueva ventana
             mostrar_imagen(filepath, "Superficies Equipotenciales")
@@ -746,6 +771,46 @@ def graficar_equipotenciales():
     except Exception as e:
         messagebox.showerror("Error", f"Error inesperado: {str(e)}")
 
+def graficar_superposicion():
+    """
+    Construye la lista de cargas desde la UI y muestra la superposición
+    de equipotenciales + líneas de campo (para ver el corte a 90°).
+    """
+    try:
+        # leer cargas y coords (mismo esquema que graficar_equipotenciales)
+        cargas = []
+
+        # Carga 1
+        c1 = float(carga1.get()); x1, y1 = parsear_coordenadas(carga1_xy.get()); cargas.append((c1, x1, y1))
+        # Carga 2
+        c2 = float(carga2.get()); x2, y2 = parsear_coordenadas(carga2_xy.get()); cargas.append((c2, x2, y2))
+        # Carga 3
+        c3 = float(carga3.get()); x3, y3 = parsear_coordenadas(carga3_xy.get()); cargas.append((c3, x3, y3))
+
+        # filtrar “casi cero”
+        cargas = [(q, x, y) for (q, x, y) in cargas if abs(q) >= 1e-9]
+        if not cargas:
+            messagebox.showinfo("Información", "No hay cargas significativas para graficar.")
+            return
+
+        # definir rango automático similar al usado en equipotenciales
+        xs = [x for _, x, _ in cargas]; ys = [y for _, _, y in cargas]
+        margen = 2.0
+        x_min, x_max = min(xs) - margen, max(xs) + margen
+        y_min, y_max = min(ys) - margen, max(ys) + margen
+        rango_max = max(x_max - x_min, y_max - y_min) / 2
+        cx = (min(xs) + max(xs)) / 2
+        rango = (cx - rango_max - margen, cx + rango_max + margen)
+
+        # graficar
+        filepath = graficar_superposicion_equipotenciales_y_campo(cargas, rango=rango)
+
+        print(f"Gráfico superpuesto guardado en: {filepath}")
+        mostrar_imagen(filepath, "Equipotenciales + Líneas de Campo (90°)")
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo generar el gráfico superpuesto: {str(e)}")
+
+
 def mostrar_imagen(filepath, title="Imagen"):
     """Muestra una imagen en una nueva ventana redimensionándola a la pantalla."""
     try:
@@ -753,10 +818,19 @@ def mostrar_imagen(filepath, title="Imagen"):
         ventana = Toplevel()
         ventana.title(title)
         ventana.update_idletasks()  # asegurar métricas de pantalla
-        
-        # Tamaño máximo permitido (85% de la pantalla)
-        max_w = int(ventana.winfo_screenwidth() * 0.85)
-        max_h = int(ventana.winfo_screenheight() * 0.85)
+
+        # Obtener dimensiones de la pantalla
+        screen_width = ventana.winfo_screenwidth()
+        screen_height = ventana.winfo_screenheight()
+
+        # Calcular dimensiones de la ventana de imagen (aprox. 55% del ancho de pantalla)
+        graph_width = int(screen_width * 0.55)
+        graph_height = int(screen_height * 0.85)
+
+        # Posicionar a la derecha de la ventana principal
+        margin = 20
+        main_width = int(screen_width * 0.4)
+        x_position = main_width + margin * 2
         
         # Cargar imagen
         # Asegurarse de que la ruta sea absoluta
@@ -766,21 +840,22 @@ def mostrar_imagen(filepath, title="Imagen"):
 
         img = Image.open(filepath)
         # Redimensionar manteniendo relación de aspecto si excede el tamaño permitido
-        if img.width > max_w or img.height > max_h:
-            img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
-        
+        if img.width > graph_width - 40 or img.height > graph_height - 80:
+            img.thumbnail((graph_width - 40, graph_height - 80), Image.Resampling.LANCZOS)
+
         photo = ImageTk.PhotoImage(img)
-        
+
         # Mantener referencia a la imagen
         global photo_references
         photo_references.append(photo)
-        
+
+        # Posicionar ventana y ajustar tamaño
+        ventana.geometry(f"{graph_width}x{graph_height}+{x_position}+{margin}")
+
         # Mostrar imagen
         label = Label(ventana, image=photo)
         label.pack(padx=10, pady=10)
-        
-        # Ajustar tamaño de la ventana a la imagen
-        ventana.geometry(f"{img.width + 40}x{img.height + 80}")
+
         ventana.minsize(300, 200)
         
         # Botón para cerrar
@@ -885,104 +960,137 @@ def crear_interfaz():
 
     root = Tk()
     root.title("Laboratorio Computacional 1 - Física")
-    root.geometry("1000x500")
-    
-    Label(root, text="Carga 1: ").grid(row=0, column=0, padx=10, pady=10)
-    carga1 = Entry(root)
-    carga1.grid(row=0, column=1, padx=10, pady=10)
 
-    Label(root, text="Coordenada (x,y) Carga 1: ").grid(row=0, column=2, padx=10, pady=10)
-    carga1_xy = Entry(root)
-    carga1_xy.grid(row=0, column=3, padx=10, pady=10)
+    # Obtener dimensiones de la pantalla
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
 
-    Label(root, text="Carga 2: ").grid(row=1, column=0, padx=10, pady=10)
-    carga2 = Entry(root)
-    carga2.grid(row=1, column=1, padx=10, pady=10)
+    # Calcular dimensiones de la ventana principal (aprox. 40% del ancho de pantalla)
+    main_width = int(screen_width * 0.4)
+    main_height = int(screen_height * 0.85)
 
-    Label(root, text="Coordenada (x,y) Carga 2: ").grid(row=1, column=2, padx=10, pady=10)
-    carga2_xy = Entry(root)
-    carga2_xy.grid(row=1, column=3, padx=10, pady=10)
+    # Posicionar en el lado izquierdo con margen
+    margin = 20
+    root.geometry(f"{main_width}x{main_height}+{margin}+{margin}")
+    root.minsize(600, 720)
 
-    Label(root, text="Carga 3: ").grid(row=2, column=0, padx=10, pady=10)
-    carga3 = Entry(root)
-    carga3.grid(row=2, column=1, padx=10, pady=10)
+    # Crear frame principal centrado
+    main_container = Frame(root)
+    main_container.pack(expand=True, fill='both')
 
-    Label(root, text="Coordenada (x,y) Carga 3: ").grid(row=2, column=2, padx=10, pady=10)
-    carga3_xy = Entry(root)
-    carga3_xy.grid(row=2, column=3, padx=10, pady=10)
+    # Frame contenedor centrado
+    content_frame = Frame(main_container)
+    content_frame.pack(expand=True, anchor='center', pady=20)
 
-    Label(root, text="Punto de entrada (x,y):").grid(row=3, column=0, padx=10, pady=10)
-    entry_punto = Entry(root)
-    entry_punto.grid(row=3, column=1, padx=10, pady=10)
-    
+    # Configurar grid para centrado
+    for i in range(4):
+        content_frame.grid_columnconfigure(i, weight=1)
+
+    # Campos de entrada
+    Label(content_frame, text="Carga 1: ").grid(row=0, column=0, padx=10, pady=10, sticky='e')
+    carga1 = Entry(content_frame)
+    carga1.grid(row=0, column=1, padx=10, pady=10, sticky='w')
+
+    Label(content_frame, text="Coordenada (x,y) Carga 1: ").grid(row=0, column=2, padx=10, pady=10, sticky='e')
+    carga1_xy = Entry(content_frame)
+    carga1_xy.grid(row=0, column=3, padx=10, pady=10, sticky='w')
+
+    Label(content_frame, text="Carga 2: ").grid(row=1, column=0, padx=10, pady=10, sticky='e')
+    carga2 = Entry(content_frame)
+    carga2.grid(row=1, column=1, padx=10, pady=10, sticky='w')
+
+    Label(content_frame, text="Coordenada (x,y) Carga 2: ").grid(row=1, column=2, padx=10, pady=10, sticky='e')
+    carga2_xy = Entry(content_frame)
+    carga2_xy.grid(row=1, column=3, padx=10, pady=10, sticky='w')
+
+    Label(content_frame, text="Carga 3: ").grid(row=2, column=0, padx=10, pady=10, sticky='e')
+    carga3 = Entry(content_frame)
+    carga3.grid(row=2, column=1, padx=10, pady=10, sticky='w')
+
+    Label(content_frame, text="Coordenada (x,y) Carga 3: ").grid(row=2, column=2, padx=10, pady=10, sticky='e')
+    carga3_xy = Entry(content_frame)
+    carga3_xy.grid(row=2, column=3, padx=10, pady=10, sticky='w')
+
+    Label(content_frame, text="Punto de entrada (x,y):").grid(row=3, column=0, padx=10, pady=10, sticky='e')
+    entry_punto = Entry(content_frame)
+    entry_punto.grid(row=3, column=1, padx=10, pady=10, sticky='w')
+
     # Frame para los botones de configuración
-    config_frame = Frame(root)
+    config_frame = Frame(content_frame)
     config_frame.grid(row=4, column=0, columnspan=4, pady=10)
-    
+
     # Botón para cargar configuración predeterminada
-    Button(config_frame, text="Cargar Configuración Predeterminada", 
+    Button(config_frame, text="Cargar Configuración Predeterminada",
            command=cargar_configuracion_predeterminada,
            font=('Arial', 10), bg='lightgreen', pady=5).pack(pady=5)
-    
+
     # Frame para los botones de Campo Eléctrico
-    campo_frame = Frame(root)
+    campo_frame = Frame(content_frame)
     campo_frame.grid(row=5, column=0, columnspan=4, pady=10)
-    
-    Label(campo_frame, text="CAMPO ELÉCTRICO E(x,y)", 
+
+    Label(campo_frame, text="CAMPO ELÉCTRICO E(x,y)",
           font=('Arial', 12, 'bold'), fg='#2c3e50').pack(pady=(0,5))
-    
+
     # Botones de campo eléctrico
     buttons_campo_frame = Frame(campo_frame)
     buttons_campo_frame.pack()
-    
-    Button(buttons_campo_frame, text="Calcular Campo con Config. Predeterminada", 
+
+    Button(buttons_campo_frame, text="Calcular Campo con Config. Predeterminada",
            command=calcular_y_graficar_predeterminado,
            font=('Arial', 10), bg='lightcoral', pady=5).pack(side='left', padx=5)
-    
-    Button(buttons_campo_frame, text="Calcular Campo Eléctrico", 
+
+    Button(buttons_campo_frame, text="Calcular Campo Eléctrico",
            command=calcular_graficar,
            font=('Arial', 10), bg='lightblue', pady=5).pack(side='left', padx=5)
-    
+
     # Frame para los botones de Potencial Eléctrico
-    potencial_frame = Frame(root)
+    potencial_frame = Frame(content_frame)
     potencial_frame.grid(row=6, column=0, columnspan=4, pady=10)
-    
-    Label(potencial_frame, text="POTENCIAL ELÉCTRICO V(x,y)", 
+
+    Label(potencial_frame, text="POTENCIAL ELÉCTRICO V(x,y)",
           font=('Arial', 12, 'bold'), fg='#27ae60').pack(pady=(0,5))
-    
+
     # Botones de potencial eléctrico
     buttons_potencial_frame = Frame(potencial_frame)
     buttons_potencial_frame.pack()
-    
-    Button(buttons_potencial_frame, text="Calcular Potencial con Config. Predeterminada", 
+
+    Button(buttons_potencial_frame, text="Calcular Potencial con Config. Predeterminada",
            command=calcular_potencial_predeterminado,
            font=('Arial', 10), bg='lightyellow', pady=5).pack(side='left', padx=5)
-    
-    Button(buttons_potencial_frame, text="Calcular Potencial Eléctrico", 
+
+    Button(buttons_potencial_frame, text="Calcular Potencial Eléctrico",
            command=calcular_potencial,
            font=('Arial', 10), bg='lightcyan', pady=5).pack(side='left', padx=5)
-    
+
     # Frame para el botón de Superficies Equipotenciales
-    equipotencial_frame = Frame(root)
+    equipotencial_frame = Frame(content_frame)
     equipotencial_frame.grid(row=7, column=0, columnspan=4, pady=10)
-    
-    Label(equipotencial_frame, text="SUPERFICIES EQUIPOTENCIALES", 
+
+    Label(equipotencial_frame, text="SUPERFICIES EQUIPOTENCIALES",
           font=('Arial', 12, 'bold'), fg='#8e44ad').pack(pady=(0,5))
-    
+
     # Botón para graficar superficies equipotenciales
-    Button(equipotencial_frame, text="Graficar Superficies Equipotenciales", 
+    Button(equipotencial_frame, text="Graficar Superficies Equipotenciales",
            command=graficar_equipotenciales,
            font=('Arial', 10, 'bold'), bg='#e6c9ff', pady=8).pack(pady=5)
 
+    # Botón para superposición
+    Button(equipotencial_frame, text="Superponer: Campo + Equipotenciales",
+           command=graficar_superposicion,
+           font=('Arial', 10, 'bold'), bg='#d0f0ff', pady=8).pack(pady=5)
+
     # Instrucciones para el usuario
-    instrucciones_frame = Frame(root)
+    instrucciones_frame = Frame(content_frame)
     instrucciones_frame.grid(row=8, column=0, columnspan=4, pady=10)
     
     instrucciones_text = ("Instrucciones:\n"
-                         "• Use 'Cargar Configuración Predeterminada' para cargar valores de ejemplo\n"
-                         "• CAMPO ELÉCTRICO: Calcula E(x,y) y genera gráficos de E(x) vs x y líneas de campo\n"
-                         "• POTENCIAL ELÉCTRICO: Calcula V(x,y) numéricamente (resultado en ventana emergente)\n"
-                         "• SUPERFICIES EQUIPOTENCIALES: Genera un gráfico de contorno del potencial eléctrico\n"
+                         "• Cargar Configuración Predeterminada: Carga valores de ejemplo para las 3 cargas y el punto\n"
+                         "• Calcular Campo con Config. Predeterminada: Carga configuración y calcula campo automáticamente\n"
+                         "• Calcular Campo Eléctrico: Calcula E(x,y) con valores ingresados y muestra gráficos E(x) vs x + líneas de campo\n"
+                         "• Calcular Potencial con Config. Predeterminada: Carga configuración y calcula potencial automáticamente\n"
+                         "• Calcular Potencial Eléctrico: Calcula V(x,y) numéricamente y muestra gráfico de equipotenciales\n"
+                         "• Graficar Superficies Equipotenciales: Genera gráfico de contorno del potencial eléctrico\n"
+                         "• Superponer: Campo + Equipotenciales: Muestra líneas de campo y equipotenciales en un solo gráfico\n"
                          "• Formato de cargas: notación científica (ej: 3e-6 para 3×10⁻⁶ C)\n"
                          "• Formato de coordenadas: x, y (ej: 0.1, 0.2)")
     
@@ -990,7 +1098,7 @@ def crear_interfaz():
           fg='gray', justify='left').pack()
 
     # Frame para el resultado (inicialmente vacío)
-    label_resultado = Label(root, text="", font=('Arial', 12), fg='#FFFFFF', justify='left')
+    label_resultado = Label(content_frame, text="", font=('Arial', 12), fg='#FFFFFF', justify='left')
     label_resultado.grid(row=9, column=0, columnspan=4, padx=10, pady=10)
 
     root.mainloop()
