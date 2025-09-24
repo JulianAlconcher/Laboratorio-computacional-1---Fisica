@@ -285,106 +285,106 @@ def analizar_estabilidad_equilibrio(cargas, x_eq, delta=1e-4):
     else:
         return 'neutral'
 
-def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-5, 5), num_puntos=1000):
+def graficar_campo_electrico(cargas, x_punto, y_punto, rango_x=(-5, 5), num_puntos=1000,
+                             rango_y=(-1e12, 1e12)):
     """
-    Genera el gráfico de E(x) vs x para cargas individuales y superposición.
-    Incluye detección y marcado de puntos de equilibrio.
-    
-    Parámetros:
-    - cargas: lista de tuplas [(carga1, x1, y1), (carga2, x2, y2), ...]
-    - x_punto, y_punto: punto donde se calculó el campo
-    - rango_x: tupla (x_min, x_max) para el rango del gráfico
-    - num_puntos: número de puntos para el gráfico
-    
-    Retorna: (path del archivo guardado, lista de puntos de equilibrio)
+    Gráfico de E(x) vs x con escala Y fija (manual), 
+    curvas sólidas y líneas punteadas en la posición de las cargas.
     """
+
     x_values = np.linspace(rango_x[0], rango_x[1], num_puntos)
-    
-    # Encontrar puntos de equilibrio
     puntos_equilibrio = encontrar_puntos_equilibrio(cargas, rango_x)
-    
-    # Crear la figura
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
-    fig.suptitle('Campo Eléctrico E(x) vs x - Análisis de Equilibrio', fontsize=16, fontweight='bold')
-    
-    # Primer subplot: Cargas individuales
-    ax1.set_title('Cargas Individuales')
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    fig.suptitle('Campo Eléctrico E(x) vs x - Análisis de Equilibrio',
+                 fontsize=15, fontweight='bold')
+
     colors = ['red', 'blue', 'green']
-    
+
+    # ---------- Subplot 1: Cargas individuales ----------
+    ax1.set_title('Cargas Individuales')
     for i, (carga, x_carga, y_carga) in enumerate(cargas):
         Ex_values = calcular_campo_x(carga, x_carga, y_carga, x_values)
-        ax1.plot(x_values, Ex_values, color=colors[i], linewidth=2, 
-                label=f'Carga {i+1}: q={carga:.1e} C en ({x_carga}, {y_carga})')
-        
-        # Marcar la posición de la carga
-        ax1.axvline(x=x_carga, color=colors[i], linestyle='--', alpha=0.5)
-    
+
+        # cortar singularidades (para que no aparezcan paredes verticales)
+        Ex_values = np.array(Ex_values, dtype=float)
+        Ex_values[np.abs(Ex_values) > 1e12] = np.nan
+
+        ax1.plot(x_values, Ex_values, color=colors[i], linewidth=2,
+                 label=f'Carga {i+1}: q={carga:.1e} C en ({x_carga}, {y_carga})')
+
+        # línea vertical punteada en la posición de la carga
+        ax1.axvline(x=x_carga, color=colors[i],
+                    linestyle=(0, (2, 2)), linewidth=1.2, alpha=0.8)
+
     ax1.set_xlabel('x [m]')
     ax1.set_ylabel('Ex [N/C]')
     ax1.grid(True, alpha=0.3)
-    ax1.legend()
-    ax1.axhline(y=0, color='black', linewidth=0.5)
-    
-    # Segundo subplot: Superposición con puntos de equilibrio
-    ax2.set_title('Superposición - Detección de Puntos de Equilibrio')
-    
-    # Calcular campo total
+    ax1.legend(fontsize=9)
+    ax1.axhline(y=0, color='black', linewidth=0.8)
+    ax1.set_ylim(rango_y)
+
+    # ---------- Subplot 2: Superposición ----------
+    ax2.set_title('Superposición - Puntos de Equilibrio')
+
     Ex_total_values = np.zeros_like(x_values)
-    for x_val in range(len(x_values)):
-        Ex_total, _, _, _ = calcular_campo_total(cargas, x_values[x_val], 0.0)
-        Ex_total_values[x_val] = Ex_total
-    
-    ax2.plot(x_values, Ex_total_values, color='purple', linewidth=3, 
-             label='Campo Total (Superposición)')
-    
+    for idx, x_val in enumerate(x_values):
+        Ex_total, _, _, _ = calcular_campo_total(cargas, x_val, 0.0)
+        Ex_total_values[idx] = Ex_total
+
+    # cortar singularidades
+    Ex_total_values = np.array(Ex_total_values, dtype=float)
+    Ex_total_values[np.abs(Ex_total_values) > 1e12] = np.nan
+
+    ax2.plot(x_values, Ex_total_values, color='purple', linewidth=2.5,
+             alpha=0.8, label='Campo Total')
+
+    ax2.set_ylim(rango_y)
+
     # Marcar puntos de equilibrio
     if puntos_equilibrio:
-        x_eq_list = [p[0] for p in puntos_equilibrio]
-        y_eq_list = [0 for _ in puntos_equilibrio]  # Los puntos de equilibrio están en Ex = 0
-        
-        ax2.scatter(x_eq_list, y_eq_list, color='red', s=100, marker='o', 
-                   zorder=5, label=f'Puntos de Equilibrio ({len(puntos_equilibrio)})')
-        
-        # Anotar cada punto de equilibrio
         for i, (x_eq, estabilidad) in enumerate(puntos_equilibrio):
             color_est = {'estable': 'green', 'inestable': 'red', 'neutral': 'orange'}[estabilidad]
-            
-            ax2.annotate(f'Eq{i+1}: x={x_eq:.3f}m\n({estabilidad})', 
-                        xy=(x_eq, 0), xytext=(x_eq, max(Ex_total_values)*0.3),
-                        arrowprops=dict(arrowstyle='->', color=color_est, lw=2),
-                        fontsize=10, ha='center',
-                        bbox=dict(boxstyle="round,pad=0.3", facecolor=color_est, alpha=0.3))
-    
-    # Marcar el punto donde se calculó el campo
+            ax2.scatter(x_eq, 0, color=color_est, s=90, marker='o', zorder=5)
+            ax2.annotate(f'Eq{i+1}: x={x_eq:.3f} m\n({estabilidad})',
+                         xy=(x_eq, 0),
+                         xytext=(x_eq, 0.4 * rango_y[1]),
+                         arrowprops=dict(arrowstyle='->', color=color_est, lw=1.5),
+                         fontsize=9, ha='center',
+                         bbox=dict(boxstyle="round,pad=0.3",
+                                   facecolor=color_est, alpha=0.25))
+
+    # Punto de cálculo
     if rango_x[0] <= x_punto <= rango_x[1]:
         Ex_punto, _, _, _ = calcular_campo_total(cargas, x_punto, y_punto)
-        ax2.plot(x_punto, Ex_punto, 'bo', markersize=8, 
-                label=f'Punto calculado ({x_punto}, {y_punto})')
-    
+        ax2.plot(x_punto, Ex_punto, 'bo', markersize=7,
+                 label=f'Punto calculado ({x_punto}, {y_punto})')
+
     ax2.set_xlabel('x [m]')
     ax2.set_ylabel('Ex [N/C]')
     ax2.grid(True, alpha=0.3)
-    ax2.legend()
-    ax2.axhline(y=0, color='black', linewidth=1, linestyle='-', alpha=0.8)
-    
-    # Marcar posiciones de las cargas en ambos subplots
+    ax2.axhline(y=0, color='black', linewidth=0.8)
+    ax2.legend(fontsize=9)
+
+    # líneas verticales punteadas de las cargas
     for i, (_, x_carga, _) in enumerate(cargas):
-        ax2.axvline(x=x_carga, color=colors[i], linestyle='--', alpha=0.3)
-    
-    plt.tight_layout()
-    
-    # Guardar en la carpeta graphics
+        ax2.axvline(x=x_carga, color=colors[i],
+                    linestyle=(0, (2, 2)), linewidth=1.2, alpha=0.8)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+
     graphics_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'graphics')
-    if not os.path.exists(graphics_dir):
-        os.makedirs(graphics_dir)
-    
-    filename = 'campo_electrico_vs_x.png'
-    filepath = os.path.join(graphics_dir, filename)
-    
+    os.makedirs(graphics_dir, exist_ok=True)
+
+    filepath = os.path.join(graphics_dir, 'campo_electrico_vs_x.png')
     plt.savefig(filepath, dpi=150, bbox_inches='tight')
     plt.close()
-    
+
     return filepath, puntos_equilibrio
+
+
+
+
 
 def graficar_lineas_campo(cargas, x_punto, y_punto, rango=(-3, 3), resolucion=20):
     """
